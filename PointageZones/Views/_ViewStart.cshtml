@@ -1,0 +1,11 @@
+﻿
+@{
+    if (User.Identity.IsAuthenticated)
+    {
+        Layout ="~/Views/Shared/_AdminLayout.cshtml";
+    }
+    else
+    {
+        Layout = "~/Views/Shared/_AgentLayout.cshtml";
+    }
+}

@@ -1,0 +1,19 @@
+{
+    "name": "Pointage Agent",
+    "short_name": "Pointage",
+    "start_url": "/Agent/Index",
+    "display": "standalone",
+    "icons": [
+        {
+            "src": "/images/logo_mini_s_192x192.png",
+            "type": "image/png",
+            "sizes": "192x192"
+        },
+        {
+            "src": "/images/logo_mini_s.png",
+            "type": "image/png",
+            "sizes": "512x512"
+        }
+    ]
+}
+    

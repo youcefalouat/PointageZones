@@ -1,0 +1,427 @@
+﻿@model PointageZones.DTO.AdminDashboardViewModel
+
+@{
+    ViewData["Title"] = "Dashboard Admin";
+}
+
+@* <!-- Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"> *@
+
+<div class="container mt-4">
+        <form method="get" class="mb-4">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label for="startDate" class="form-label">Date début :</label>
+                <input type="datetime-local" class="form-control" name="startDate" value="@Model.DateDebut.ToString("yyyy-MM-ddTHH:mm")" />
+            </div>
+            <div class="col-md-3">
+                <label for="endDate" class="form-label">Date fin :</label>
+                <input type="datetime-local" class="form-control" name="endDate" value="@Model.DateFin.ToString("yyyy-MM-ddTHH:mm")" />
+            </div>
+            <div class="col-md-2">
+                <label for="selectedUser" class="form-label">Utilisateur :</label>
+                <select class="form-control" name="selectedUser">
+                    <option value="">Tous</option>
+                    @foreach (var user in Model.Pointages.Select(p => p.User.UserName).Distinct())
+                    {
+                        <option value="@user" selected="@(user == Model.SelectedUser ? "selected" : null)">@user</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="selectedTour" class="form-label">Tournée :</label>
+                <select class="form-control" name="selectedTour">
+                    <option value="">Toutes</option>
+                    @foreach (var tour in Model.Pointages.Select(p => p.PlanTour.Tour.RefTour).Distinct())
+                    {
+                        <option value="@tour" selected="@(tour == Model.SelectedTour ? "selected" : null)">@tour</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">Filtrer</button>
+            </div>
+        </div>
+    </form>
+
+   
+   
+    <div class="row mt-5">
+        <div class="col-12">
+            <h3 class="text-center">Tournées Éffectuées sur Prévues</h3>
+            <div class="d-flex flex-wrap justify-content-center">
+                @foreach (var plan in Model.RatioTournéesParPlan)
+                {
+                    <div class="p-2 text-center">
+                        <h5>Plan @plan.PlanTourneeId</h5>
+                        <canvas id="pieChart_@plan.PlanTourneeId" class="pie-chart"></canvas>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <br />
+
+        <div class="col-12 mt-5">
+            <h3 class="text-center">Nombre Pointages Zones par utilisateur</h3>
+            <canvas id="barChart"></canvas>
+        </div>
+
+        <br />
+        
+
+        
+    </div>
+
+   
+    @*   <div class="row mt-5">
+        <div class="col-12">
+            <h3 class="mb-3">Détail des tournées</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Tournée</th>
+                            <th>Date</th>
+                            <th>N° Tour</th>
+                            <th>Début prévu</th>
+                            <th>Fin prévue</th>
+                            <th>Début réel</th>
+                            <th>Fin réelle</th>
+                            <th>Statut</th>
+                            <th>Zones requises</th>
+                            <th>Zones pointées</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tour in Model.tourDuJourViewModels.OrderBy(t => t.Date).ThenBy(t => t.TourRefTour).ThenBy(t => t.NumeroTour))
+                        {
+                            <tr class="@(tour.tourFait ? "table-success" : "table-danger")">
+                                <td>@tour.TourRefTour</td>
+                                <td>@tour.Date.Value.ToString("yyyy-MM-dd")</td>
+                                <td>@tour.NumeroTour</td>
+                                <td>@tour.debTour.ToString("HH:mm")</td>
+                                <td>@tour.finTour.ToString("HH:mm")</td>
+                                <td>@(tour.debPointage?.ToString("HH:mm") ?? "-")</td>
+                                <td>@(tour.finPointage?.ToString("HH:mm") ?? "-")</td>
+                                <td>
+                                    @if (tour.tourFait)
+                                    {
+                                        <span class="badge bg-success">Complète</span>
+                                    }
+                                    else if (tour.ZonesPointees > 0)
+                                    {
+                                        <span class="badge bg-warning">Incomplète</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Non effectuée</span>
+                                    }
+                                </td>
+                                <td>@tour.ZonesRequises</td>
+                                <td>@tour.ZonesPointees</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div> *@
+
+    <div class="row mt-5">
+        <div class="col-12">
+            <h3 class="mb-3">Détail des tournées</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th></th> <!-- Pour la flèche -->
+                            <th>Tournée</th>
+                            <th>Date</th>
+                            <th>N° Tour</th>
+                            <th>Début prévu</th>
+                            <th>Fin prévue</th>
+                            <th>Début réel</th>
+                            <th>Fin réelle</th>
+                            <th>Statut</th>
+                            <th>Zones requises</th>
+                            <th>Zones pointées</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var group in Model.tourDuJourViewModels
+                        .OrderBy(t => t.Date)
+                        .ThenBy(t => t.TourRefTour)
+                        .GroupBy(t => new { t.TourRefTour, t.Date }))
+                        {
+                            var firstTour = group.First();
+                            var tourId = firstTour.TourRefTour + "_" + firstTour.Date?.ToString("yyyyMMdd");
+
+                            <tr class="table-primary @(firstTour.tourFait ? "table-success" : "table-danger")">
+                                <td>
+                                    <button class="btn btn-sm btn-outline-dark toggle-group" data-group="@tourId">
+                                        ➕
+                                    </button>
+                                </td>
+                                <td>
+                                    <a asp-controller="Agent" asp-action="TourDuJour" asp-route-id="@firstTour.TourId" asp-route-date="@firstTour.Date">
+                                        @firstTour.TourRefTour
+                                    </a>
+                                </td>
+                                <td>@firstTour.Date?.ToString("dd/MM/yyyy")</td>
+                                <td>@firstTour.NumeroTour</td>
+                                <td>@firstTour.debTour.ToString("HH:mm")</td>
+                                <td>@firstTour.finTour.ToString("HH:mm")</td>
+                                <td>@(firstTour.debPointage?.ToString("HH:mm") ?? "-")</td>
+                                <td>@(firstTour.finPointage?.ToString("HH:mm") ?? "-")</td>
+                                <td>
+                                    @if (firstTour.tourFait)
+                                    {
+                                        <span class="badge bg-success">Complète</span>
+                                    }
+                                    else if (firstTour.ZonesPointees > 0)
+                                    {
+                                        <span class="badge bg-warning">Incomplète</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Non effectuée</span>
+                                    }
+                                </td>
+                                <td>@firstTour.ZonesRequises</td>
+                                <td>@firstTour.ZonesPointees</td>
+                            </tr>
+
+                            @foreach (var tour in group.Skip(1)) // Affiche les tournées cachées
+                            {
+                                <tr class="group-@tourId d-none @(tour.tourFait ? "table-success" : (tour.TourAssigné ? "table-alert" : "table-danger"))">
+                                    <td></td>
+                                    <td>
+                                        <a asp-controller ="Agent" asp-action="TourDuJour" asp-route-id="@tour.TourId" asp-route-date="@tour.Date">
+                                            @tour.TourRefTour
+                                        </a>
+                                    </td>
+                                    <td>
+                                        @tour.Date?.ToString("dd/MM/yyyy")
+                                     </td>
+                                    <td>@tour.NumeroTour</td>
+                                    <td>@tour.debTour.ToString("HH:mm")</td>
+                                    <td>@tour.finTour.ToString("HH:mm")</td>
+                                    <td>@(tour.debPointage?.ToString("HH:mm") ?? "-")</td>
+                                    <td>@(tour.finPointage?.ToString("HH:mm") ?? "-")</td>
+                                    <td>
+                                        @if (tour.tourFait)
+                                        {
+                                            <span class="badge bg-success">Complète</span>
+                                        }
+                                        else if (tour.ZonesPointees > 0)
+                                        {
+                                            <span class="badge bg-warning">Incomplète</span>
+                                        }
+                                        else if (tour.TourAssigné == true)
+                                        {
+                                            <span class="badge bg-warning">Affécté</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">Non Affécté</span>
+                                        }
+                                    </td>
+                                    <td>@tour.ZonesRequises</td>
+                                    <td>@tour.ZonesPointees</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <h3 class="mb-3">Liste des pointages Avec anciens Code QR</h3>
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th>Utilisateur</th>
+                    <th>Tournée</th>
+                    <th>Zone</th>
+                    <th>Horodatage</th>
+                    <th>Horodatage de l'assignation</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var pointage in Model.Pointages.Where(p => p.IsValid == 0 && p.IsChecked == 1))
+                {
+                    <tr class="bg-danger text-white">
+                        <td>@pointage.User.UserName</td>
+                        <td>@pointage.PlanTour.Tour.RefTour</td>
+                        <td>@pointage.PlanTour.Zone.RefZone</td>
+                        <td>@pointage.DateTimeScan?.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@pointage.DateTimeAssign?.ToString("yyyy-MM-dd HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+
+    <h3 class="mb-3">Liste des pointages Affécté mais Non Checké</h3>
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th>Utilisateur</th>
+                    <th>Tournée</th>
+                    <th>Zone</th>
+                    <th>Horodatage</th>
+                    <th>Horodatage de l'assignation</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var pointage in Model.Pointages.Where(p => p.IsValid == 0 && p.IsChecked == 0))
+                {
+                    <tr class="bg-warning text-white">
+                        <td>@pointage.User.UserName</td>
+                        <td>@pointage.PlanTour.Tour.RefTour</td>
+                        <td>@pointage.PlanTour.Zone.RefZone</td>
+                        <td>@pointage.DateTimeScan?.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@pointage.DateTimeAssign?.ToString("yyyy-MM-dd HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <h3 class="mb-3">Liste des pointages Valide</h3>
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th>Utilisateur</th>
+                    <th>Tournée</th>
+                    <th>Zone</th>
+                    <th>Horodatage du scan</th>
+                    <th>Horodatage de l'assignation</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var pointage in Model.Pointages.Where(p => p.IsValid == 1 && p.IsChecked == 1))
+                {
+                    <tr class="bg-success text-white">
+                        <td>@pointage.User.UserName</td>
+                        <td>@pointage.PlanTour.Tour.RefTour</td>
+                        <td>@pointage.PlanTour.Zone.RefZone</td>
+                        <td>@pointage.DateTimeScan?.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@pointage.DateTimeAssign?.ToString("yyyy-MM-dd HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+
+
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll(".toggle-group").forEach(button => {
+                button.addEventListener("click", function () {
+                    let group = this.getAttribute("data-group");
+                    let rows = document.querySelectorAll(".group-" + group);
+
+                    rows.forEach(row => {
+                        row.classList.toggle("d-none");
+                    });
+
+                    // Change le bouton + en -
+                    if (this.innerHTML === "➕") {
+                        this.innerHTML = "➖";
+                    } else {
+                        this.innerHTML = "➕";
+                    }
+                });
+            });
+        });
+    </script>
+
+
+    
+
+</div>
+
+<script>
+        var barChartInstance = null;
+    function createBarChart() {
+        var ctx = document.getElementById('barChart').getContext('2d');
+        if (barChartInstance) {
+            barChartInstance.destroy();
+        }
+        barChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: @Html.Raw(Json.Serialize(Model.NombrePointagesParUtilisateur.Select(u => "Utilisateur " + u.UtilisateurId))),
+                datasets: [{
+                    label: 'Pointages',
+                    data: @Html.Raw(Json.Serialize(Model.NombrePointagesParUtilisateur.Select(u => u.Nombre))),
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+    function createPieCharts() {
+    @foreach (var plan in Model.RatioTournéesParPlan.Where(p => p.Total > 0))
+    {
+        <text>
+                    var ctx_@plan.PlanTourneeId = document.getElementById('pieChart_@plan.PlanTourneeId').getContext('2d');
+                    if (ctx_@plan.PlanTourneeId) {
+                        new Chart(ctx_@plan.PlanTourneeId, {
+                            type: 'pie',
+                            data: {
+                                labels: ['Effectué', 'Non Effectué'],
+                                datasets: [{
+                                    data: [@plan.Effectue, Math.max(0, @plan.Total - @plan.Effectue)],
+                                    backgroundColor: ['#36A2EB', '#FF6384'],
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false
+                            }
+                        });
+                    }
+        </text>
+    }
+    }
+    // Créer les graphiques après le chargement
+    document.addEventListener("DOMContentLoaded", function() {
+        createBarChart();
+        createPieCharts();
+    });
+</script>
+
+<!-- CSS pour empêcher les graphes de s'agrandir -->
+<style>
+    canvas {
+        max-width: 100%;
+        height: 350px !important;
+    }
+
+    .row {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .col-md-4 {
+        flex: 1 1 30%;
+        padding: 10px;
+    }
+</style>

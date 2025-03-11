@@ -1,0 +1,47 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Hors Ligne</title>
+    <link rel="stylesheet" href="/lib/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/site.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0d6efd">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+            flex-direction: column;
+            padding: 1rem;
+        }
+
+        .offline-box {
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-box">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" class="bi bi-wifi-off mb-3 text-warning" viewBox="0 0 16 16">
+            <path d="M10.706 3.294A12.545 12.545 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.518.518 0 0 0 .732.052 11.542 11.542 0 0 1 3.17-.919a.5.5 0 0 0 .488-.634A10.05 10.05 0 0 0 3.8 6.613a.5.5 0 0 0-.45.686A9.96 9.96 0 0 0 8 12.5c.331 0 .658-.017 1.017-.05a.5.5 0 0 0 .487-.634A9.99 9.99 0 0 0 8.354 9.4a.5.5 0 0 0-.622.546 8.961 8.961 0 0 1 4.063 1.758.518.518 0 0 0 .732-.052.485.485 0 0 0-.048-.736A12.53 12.53 0 0 0 8 3a12.53 12.53 0 0 0-2.706.294z" />
+            <path d="M13.889 10.111a5.001 5.001 0 0 0-7.778 0 .485.485 0 0 0-.048.736.518.518 0 0 0 .732.052 4.001 4.001 0 0 1 6.364 0 .518.518 0 0 0 .732-.052.485.485 0 0 0-.048-.736zM1.323 11.355a.485.485 0 0 0-.048.736.518.518 0 0 0 .732.052 4.001 4.001 0 0 1 1.84-1.053A.5.5 0 0 0 3.6 10.9a5.001 5.001 0 0 0-2.277.455z" />
+            <path d="M.323 14.355a.485.485 0 0 0-.048.736.518.518 0 0 0 .732.052 4.001 4.001 0 0 1 1.84-1.053A.5.5 0 0 0 2.6 13.9a5.001 5.001 0 0 0-2.277.455z" />
+            <path d="M15.355 13.645a.485.485 0 0 0-.048.736.518.518 0 0 0 .732.052 4.001 4.001 0 0 0 1.84-1.053A.5.5 0 0 0 17.6 12.9a5.001 5.001 0 0 1-2.277.455z" />
+            <path d="M15.355 14.355a.485.485 0 0 0-.048.736.518.518 0 0 0 .732.052 4.001 4.001 0 0 0 1.84-1.053A.5.5 0 0 0 17.6 13.9a5.001 5.001 0 0 1-2.277.455z" />
+            <path d="M2.999 14.111a5.001 5.001 0 0 1 7.778 0 .485.485 0 0 1 .048.736.518.518 0 0 1-.732.052 4.001 4.001 0 0 0-6.364 0 .518.518 0 0 1-.732-.052.485.485 0 0 1 .048-.736z" />
+        </svg>
+        <div class="alert alert-warning offline-alert" role="alert">
+            <h4 class="alert-heading">Vous êtes hors ligne</h4>
+            <p>Impossible de charger la page demandée car vous n'êtes pas connecté à Internet et cette page n'était pas disponible dans le cache.</p>
+            <hr>
+            <p class="mb-0">Veuillez vérifier votre connexion et réessayer.</p>
+        </div>
+        <p><a href="/" class="btn btn-primary">Retour à l'accueil</a></p>
+    </div>
+
+</body>
+</html>

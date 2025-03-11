@@ -1,0 +1,64 @@
+﻿@model IEnumerable<PointageZones.Models.Tour>
+
+@{
+    ViewData["Title"] = "Index";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<br />
+
+<p>
+    <a asp-action="Create" class="btn btn-success">Créer Nouvelle Tournée</a>
+</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.RefTour)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Type)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Observation)
+            </th>
+            <th>Début</th>
+            <th>Fin</th>
+            <th>Fréquence (min)</th>
+            <th>
+                Zones
+            </th>
+
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.RefTour)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Type)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Observation)
+            </td>
+                <td>@Html.DisplayFor(modelItem => item.DebTour)</td>
+                <td>@Html.DisplayFor(modelItem => item.FinTour)</td>
+                <td>@Html.DisplayFor(modelItem => item.FrqTourMin)</td>
+                <td>
+                    <b>@string.Join(" | ", item.PlanTours.Select(pt => pt.Zone.RefZone))</b>
+                </td>
+                <td>
+                    <div class="d-flex flex-column flex-md-row gap-2">
+                        <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-primary btn-sm">Détails</a>
+                        <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-warning btn-sm">Modifier</a>
+                        <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-danger btn-sm">Supprimer</a>
+                        <a asp-controller="PlanTours" asp-action="Edit" asp-route-id="@item.Id" class="btn btn-warning btn-sm text-uppercase">Modifier les zones</a>
+                    </div>
+                </td>
+        </tr>
+}
+    </tbody>
+</table>

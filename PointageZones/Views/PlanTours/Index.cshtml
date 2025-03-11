@@ -1,0 +1,71 @@
+﻿@* @model IEnumerable<PointageZones.Models.PlanTour>
+
+@{
+    ViewData["Title"] = "Index";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<h1>Index</h1>
+
+<p>
+    <a asp-action="Create">Create New</a>
+</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.Tour)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Zone)
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.Tour.RefTour)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Zone.RefZone)
+            </td>
+            <td>
+                <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
+                <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
+                <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+            </td>
+        </tr>
+}
+    </tbody>
+</table>
+ *@
+
+
+@model IEnumerable<PointageZones.Models.Tour>
+<br />
+<br />
+<table class="table">
+    <thead>
+        <tr>
+            <th>Tour</th>
+            <th>Zones Affectées</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var tour in Model)
+        {
+            <tr>
+                <td>@tour.RefTour</td>
+                <td class="text-warning">
+                    <b>@string.Join(" | ", tour.PlanTours.Select(pt => pt.Zone.RefZone))</b>
+                </td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@tour.Id" class="btn btn-warning text-uppercase">Modifier l'afféctation</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

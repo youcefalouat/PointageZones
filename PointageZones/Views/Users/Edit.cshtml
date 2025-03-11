@@ -1,0 +1,80 @@
+﻿@model PointageZones.Areas.Identity.Data.User
+
+@{
+    ViewData["Title"] = "Edit";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<h1>Edit User</h1>
+<hr />
+<div class="row">
+    <div class="col-md-8">
+        <form asp-action="Edit" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <input type="hidden" asp-for="Id" />
+
+            <div class="form-group">
+                <label asp-for="Nom" class="control-label"></label>
+                <input asp-for="Nom" class="form-control" />
+                <span asp-validation-for="Nom" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Prenom" class="control-label"></label>
+                <input asp-for="Prenom" class="form-control" />
+                <span asp-validation-for="Prenom" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="UserName" class="control-label"></label>
+                <input asp-for="UserName" class="form-control" />
+                <span asp-validation-for="UserName" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label class="control-label">Rôle</label>
+                <select name="Role" class="form-control">
+                    <option disabled selected value=""> -- selectionner un role -- </option>
+                    @foreach (var role in ViewBag.Roles)
+                    {
+                        if (role == ViewBag.CurrentRole)
+                        {
+                            <option value="@role" selected>@role</option>
+                        }
+                        else
+                        {
+                            <option value="@role">@role</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="form-group">
+                <br />
+
+                <h5><b>Laissez le champ vide si vous ne voulez pas changer de mot de passe</b></h5>
+                <label asp-for="PasswordHash" class="control-label">Nouveau Mot de passe</label>
+                <input type="password" name="NewPassword" class="form-control" />
+                <span asp-validation-for="PasswordHash" class="text-danger"></span>
+            </div>
+
+            
+          
+
+            <br />
+
+            <div class="form-group">
+                <input type="submit" value="Save" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Retour à la liste</a>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

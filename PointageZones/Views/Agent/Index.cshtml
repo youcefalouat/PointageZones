@@ -1,0 +1,172 @@
+﻿@model IEnumerable<PointageZones.Models.Tour>
+
+
+
+<div class="container text-center my-4">
+    <div class="row justify-content-center">
+        <div class="col-auto clock p-3 rounded ">
+            <div class="time-box mx-2 p-3 rounded">
+                <span id="hours" class="fs-1 fw-bold">00</span>
+                <span class="time-label d-block">Heures</span>
+            </div>
+
+            <div class="time-box mx-2 p-3 rounded">
+                <span id="minutes" class="fs-1 fw-bold">00</span>
+                <span class="time-label d-block">Minutes</span>
+            </div>
+
+            <div class="time-box mx-2 p-3 rounded">
+                <span id="seconds" class="fs-1 fw-bold">00</span>
+                <span class="time-label d-block">Secondes</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<br />
+
+<div class="container mt-4">
+    <h2 class="text-center mb-3">📋 Liste des Tournées</h2>
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered text-center">
+            <thead class="table-dark">
+                <tr>
+                    <th>Référence</th>
+                    <th>Tournée Actuelle</th>
+					<th>Assigné</th>
+                    <th>Prochaine Tournée</th>
+                    <th>Commence dans</th>
+                    <th>Type</th>
+                    <th>Observation</th>
+                </tr>
+            </thead>
+            <tbody id="tourList">
+            @if (Model != null)
+            {
+                @foreach (var tour in Model)
+                {
+                    <tr id="tourRow_@tour.Id"
+                    data-id="@tour.Id"
+                    data-reftour="@tour.RefTour"
+                    data-debtour="@tour.DebTour"
+                    data-fintour="@tour.FinTour"
+                    data-frqmin="@tour.FrqTourMin">
+
+                        <td class="fw-bold">
+                            @{
+                            if (User.IsInRole("chef") || (User.IsInRole("admin")))
+                            {
+                            <a asp-action="TourDuJour" asp-controller="Agent"
+                               asp-route-id="@tour.Id" asp-route-date="@DateTime.Now.ToString("yyyy-MM-dd")">
+                                    @tour.RefTour
+                            </a>
+                            }else{
+                            @tour.RefTour
+                            }}
+                        </td>
+                        <td><span class="TourActuelle text-primary fw-bold"></span></td>
+                        <td><span class="TourAssigné text-primary fw-bold"></span></td>
+                        
+                        <td><span class="nextTourTime text-primary fw-bold"></span></td>
+                        <td><span class="countdown text-danger fw-bold"></span></td>
+                        <td>@tour.Type</td>
+                        <td>@tour.Observation</td>
+                    </tr>
+                }
+                }
+                else
+                {
+                    <tr><td colspan="7">No data available</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const hoursToShow = document.getElementById("hours");
+        const minutesToShow = document.getElementById("minutes");
+        const secondsToShow = document.getElementById("seconds");
+
+        // ⏳ Horloge en temps réel
+        setInterval(() => {
+            let now = new Date();
+            hoursToShow.textContent = String(now.getHours()).padStart(2, '0');
+            minutesToShow.textContent = String(now.getMinutes()).padStart(2, '0');
+            secondsToShow.textContent = String(now.getSeconds()).padStart(2, '0');
+        }, 1000);
+
+        // ⏳ Mise à jour toutes les minutes et reload
+        updateCountdowns();
+        setInterval(() => {
+            updateCountdowns();
+            console.log("🔄 Reloading page...");
+            window.location.reload(true);
+        }, 60 * 1000);
+    });
+
+    function updateCountdowns() {
+        let rows = document.querySelectorAll("#tourList tr");
+
+        console.log("🔄 Mise à jour des comptes à rebours...");
+
+        rows.forEach(row => {
+            let tourId = row.getAttribute("data-id");
+            let tourActuelleElement = row.querySelector(".TourActuelle");
+			let tourAssignéElement = row.querySelector(".TourAssigné");
+            let nextTourElement = row.querySelector(".nextTourTime");
+            let countdownElement = row.querySelector(".countdown");
+            let startTourBtn = row.querySelector(".startTourBtn");
+
+            console.log(`📌 Vérification de la tournée ID: ${tourId}`);
+
+            fetch(`/Agent/Check?id=${tourId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erreur serveur: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(`✅ Réponse reçue pour Tournée ${tourId}:`, data);
+
+                    if (!data.success && !data.tourPointee) {
+                       // row.style.display = "none";
+                       tourActuelleElement.innerHTML = "❌";
+                       tourAssignéElement.innerHTML = "❌";
+                       nextTourElement.innerHTML = "Fin de Tournée";
+                        console.error(`🚨 Erreur: Tournée ${tourId} indisponible.`);
+                        return;
+                    }
+
+                    row.style.display = "";
+
+                    if (!data.tourPointee) {
+                        tourActuelleElement.innerHTML = "❌";
+                        nextTourElement.innerText = data.currentTourTime;
+                        countdownElement.innerText = data.countdown;
+                    } else {
+                        tourActuelleElement.innerHTML = "✅";
+                        nextTourElement.innerText = data.nextTourTime;
+                        countdownElement.innerText = data.countdown;
+                    }
+
+					if (data.tourAssigné) {
+						tourAssignéElement.innerHTML = "✅";
+					} else {
+						tourAssignéElement.innerHTML = "❌";
+					}
+                })
+                .catch(error => {
+                    console.error(`🚨 Erreur AJAX pour Tournée ${tourId}:`, error);
+                    tourActuelleElement.innerHTML = "⚠️ Erreur";
+                    nextTourElement.innerText = "Indisponible";
+                    countdownElement.innerText = "-";
+                });
+        });
+    }
+    
+</script>
+
+

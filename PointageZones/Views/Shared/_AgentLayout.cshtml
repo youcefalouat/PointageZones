@@ -1,0 +1,74 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - PointageZones</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/PointageZones.styles.css" asp-append-version="true" />
+	<script src="~/lib/html5-qrcode.min.js"></script>
+	
+</head>
+<body>
+    @if (User.Identity.IsAuthenticated)
+    {
+
+        <nav class="navbar navbar-expand-lg navbar-dark somepharm-color-dark p-1 pl-4">
+            <a class="navbar-brand p-0" href="/">
+                <h4 class="m-0 ml-2"><img class="mr-2" width="48" src="~/images/logo_mini_s.png">PointageSecurite <i><small><small>Beta</small></small></i> </h4>
+            </a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            
+            <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                <ul class="navbar-nav flex-grow-1">
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Home" asp-action="Index">Accueil</a>
+                        
+                    </li>
+                    <li>
+                        <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Home" asp-action="Index">Gestion des Agents</a>
+                    </li>
+                </ul>
+
+            <ul class="navbar-nav">
+                @if (User.Identity.IsAuthenticated)
+                {
+                    <li class="nav-item">
+                        <form asp-controller="Home" asp-action="Logout" method="post">
+                            <button type="submit" class="nav-link btn btn-link text-white ">Déconnexion</button>
+                        </form>
+                    </li>
+                }
+                else
+                {
+                    <li class="nav-item text-white">
+                            <a class="nav-link text-white" asp-controller="Home" asp-action="Login">Se connecter</a>
+                    </li>
+                }
+            </ul>
+            </div>
+
+        </nav>
+    }
+    <div class="container">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="border-top footer text-muted">
+        <div class="container">
+            &copy; 2025 - PointageZones 
+        </div>
+    </footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

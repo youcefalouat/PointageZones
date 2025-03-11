@@ -1,0 +1,106 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - PointageZones</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+	<link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0d6efd">
+	<link rel="stylesheet" href="~/PointageZones.styles.css" asp-append-version="true" />
+	
+</head>
+<body>
+    
+
+    <nav class="navbar navbar-expand-lg navbar-dark somepharm-color-dark p-1 pl-4">
+        <a class="navbar-brand p-0" href="/">
+            <h4 class="m-0 ml-2"><img class="mr-2" width="48" src="~/images/logo_mini_s.png">PointageSecurite <i><small><small>Beta</small></small></i></h4>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto">
+                @if (User.Identity?.IsAuthenticated == true && User.IsInRole("admin") == false)  
+                {
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Agent" asp-action="Index">Accueil</a>
+                    </li>
+                }
+                @if (User.IsInRole("admin"))
+                {
+                <li class="nav-item">
+                    <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Admin" asp-action="Index">Accueil</a>
+                </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Agent" asp-action="Index">Tournée Agents</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Agent" asp-action="TourDuJour">Détail des Tournées</a>
+                    </li>
+                
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Users" asp-action="Index">Gestion des Utilisateurs</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Zones" asp-action="Index">Gestion des Zones</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Tours" asp-action="Index">Gestion des Plans de Tournées</a>
+                    </li>
+                }
+            </ul>
+
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <form asp-controller="Account" asp-action="Logout" method="post">
+                        <button type="submit" class="nav-link btn btn-link text-white text-uppercase">Déconnexion</button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    
+    <div class="container">
+        <main role="main" class="pb-3">
+            @if (TempData["Notification"] != null)
+            {
+                <div class="alert alert-warning">
+                    @TempData["Notification"]
+                </div>
+            }
+            @RenderBody()
+        </main>
+    </div>
+
+
+    <footer class="border-top footer text-muted">
+        <div class="container">
+            &copy; 2025 - PointageZones
+        </div>
+    </footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script src="~/lib/dexie.js"></script>
+    <script src="~/lib/html5-qrcode.min.js"></script>
+    @* <script src="~/lib/chart.js"></script> *@
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="~/js/db.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+	<script src="~/js/pushmanager.js"></script>
+
+
+
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+
+</html>

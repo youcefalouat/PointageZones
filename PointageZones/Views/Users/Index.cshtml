@@ -1,0 +1,59 @@
+﻿@model IEnumerable<PointageZones.Controllers.UsersController.UserRoleViewModel> // Update with your namespace
+
+@{
+    ViewData["Title"] = "Index";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<br />
+
+<p>
+    <a asp-action="Create" class="btn btn-success">Créer Nouvelle Utilisateur</a>
+</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.First().User.Nom)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.First().User.Prenom)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.First().User.UserName)
+            </th>
+            <th>
+                Rôle
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>
+                    @Html.DisplayFor(modelItem => item.User.Nom)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.User.Prenom)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.User.UserName)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Role)
+                </td>
+                <td>
+                    <div class="d-flex flex-column flex-md-row gap-2">
+                        <a asp-action="Details" asp-route-id="@item.User.Id" class="btn btn-primary">Details</a>
+                        <a asp-action="Edit" asp-route-id="@item.User.Id" class="btn btn-warning">Modifier</a>
+                        <a asp-action="Delete" asp-route-id="@item.User.Id" class="btn btn-danger">Supprimer</a>
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+

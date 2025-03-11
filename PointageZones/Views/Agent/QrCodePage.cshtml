@@ -1,0 +1,221 @@
+﻿<div class="text-center">
+    
+    
+
+    <div id="refZone">
+    
+    </div>
+    <br />
+    <br />
+    <div id="demo"></div>
+    
+    <!-- Conteneur du lecteur QR -->
+    <div class="d-flex justify-content-center">
+        <div id="reader" style="width: 100%; max-width: 400px; min-width: 250px;"></div>
+    </div>
+
+
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", async function () {
+
+
+        const readerDiv = document.getElementById("reader"); // Pour afficher les erreurs scanner
+        const refZoneContainer = document.getElementById('refZone');
+
+        // Récupérer planTourId depuis l'URL (ex: /Agent/ScannerQRCode/501)
+        // Adaptez si votre URL est structurée différemment
+        const pathSegments = window.location.pathname.split('/');
+        const planTourId = parseInt(pathSegments[pathSegments.length - 1]);
+
+        if (isNaN(planTourId)) {
+            console.error("IDs invalides (NaN)!", planTourId);
+            readerDiv.innerHTML = '<p class="alert alert-danger">Erreur: Identifiants de pointage invalides.</p>';
+            return;
+        }
+
+        console.log("IDs récupérés:", planTourId);
+
+
+        // --- Étape 2: Vérifier l'accès à IndexedDB (Dexie) ---
+        if (!window.pointageDB) {
+             console.error("IndexedDB (pointageDB via Dexie) n'est pas initialisé !");
+             readerDiv.innerHTML = '<p class="alert alert-danger">Erreur: Base de données locale non disponible.</p>';
+             return;
+        }
+        const db = window.pointageDB; // Utiliser l'instance Dexie globale
+
+        // --- Étape 3: Configuration et Démarrage du Scanner ---
+        const html5QrCode = new Html5Qrcode("reader");
+        const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+
+        // 4a. Récupérer la référence attendue (RefZone) depuis IndexedDB
+                console.log(`Recherche planTourId=${planTourId}`);
+
+                const toursData = await db.toursData.toArray();
+
+                // On cherche le tour qui contient notre planTourId dans sa liste de zones
+                let tourId = null;
+                let zoneInfo = null;
+
+                for (const tour of toursData) {
+                    // Vérifie si le tour a des zones et parcourt ces zones
+                    if (tour.zones && Array.isArray(tour.zones)) {
+                        const foundZone = tour.zones.find(zone => zone.planTourId === planTourId);
+                        if (foundZone) {
+                            tourId = tour.tourId;
+                            zoneInfo = foundZone;
+                            break;
+                        }
+                    }
+                }
+
+                if (!zoneInfo || !zoneInfo.zoneId || !tourId) {
+                    throw new Error(`Informations pour planTourId ${planTourId} non trouvées dans les données locales de la tournée.`);
+                }
+                console.log(`Veuillez placer la caméra sur le code Qr de la zone`);
+                console.log(`Veuillez ${zoneInfo.refZone}`);
+                 // Display the zone reference here
+                refZoneContainer.innerHTML = `<h2>Veuillez placer la caméra sur le code Qr de la zone :</h2><br/><h2 style="color: green; font-size: 1.5em; font-weight: bold;">${zoneInfo.refZone}</h2>`;
+                const zoneId = zoneInfo.zoneId;
+                console.log(`Zone trouvée: ${zoneId} dans Tour ID: ${tourId}`);
+    
+        // --- Étape 4: Callback en cas de succès de scan (Logique Hors Ligne Principale) ---
+        const qrCodeSuccessCallback = async (decodedText, decodedResult) => {
+            console.log(`Code scanné : ${decodedText}`);
+            html5QrCode.pause(true); // Mettre en pause dès qu'un code est lu
+
+    try { 
+                const qrZoneIdParts = decodedText.split(";");
+
+                const qrZoneId = qrZoneIdParts[0];
+
+                console.log("Type de zoneId:", typeof zoneId, "Valeur de zoneId:", zoneId);
+                console.log("Type de qrZoneId:", typeof qrZoneId, "Valeur de qrZoneId:", qrZoneId);
+
+
+                // 4b. Validation Côté Client
+            if (parseInt(zoneId, 10) !== parseInt(qrZoneId.trim(), 10)) {
+                        // Code QR lu ne correspond pas à la référence attendue
+                        console.warn(`Validation locale ÉCHOUÉE. Attendu: ${zoneId}, Scanné: ${qrZoneId}`);
+                        alert(`Code QR incorrect pour cette zone.\nAttendu: ${zoneId}\nScanné: ${qrZoneId}\nVeuillez scanner le bon code.`);
+                        html5QrCode.resume(); // Reprendre le scan pour un nouvel essai
+                        return; // Ajouter un return ici pour stopper l'exécution si la validation échoue
+            } else {
+                        console.log("Validation locale RÉUSSIE !");
+
+                        // 4c. Préparer l'enregistrement pour pendingScans
+                        const scanRecord = {
+							pointageId: zoneInfo.pointageId,
+                            planTourId: planTourId,
+                            qrCodeText: decodedText,
+                            timestamp: new Date().toISOString()
+                        };
+
+                    // 4d. Vérifier si un scan pour CE planTourId est déjà en attente
+                    try {
+                        const existingPending = await db.pendingScans.where({ planTourId: planTourId }).first();
+                        if (existingPending) {
+                            console.log(`Scan pour planTourId ${planTourId} déjà en attente.`);
+                            alert(`Ce pointage a déjà été enregistré localement et attend la synchronisation.`);
+                            // Rediriger même si déjà en attente
+                            window.location.href = `/Agent/DebutTour/${tourId}`; // Redirection JS
+                            return; // Arrêter ici
+                        }
+
+                        // 4e. Sauvegarder dans pendingScans (IndexedDB) via Dexie
+                        const recordId = await db.pendingScans.add(scanRecord);
+                        console.log(`Scan enregistré localement dans pendingScans avec ID local: ${recordId}`, scanRecord);
+                        alert("Pointage enregistré localement ! Il sera envoyé au serveur dès que possible.");
+
+                                console.log(`Mise à jour toursData pour tourId ${tourId} : retrait planTourId ${planTourId}`);
+                                // Récupérer l'enregistrement actuel de la tournée
+                                const currentTourData = await db.toursData.get(tourId);
+
+                                if (currentTourData && currentTourData.zones && Array.isArray(currentTourData.zones)) {
+                                    // Filtrer le tableau des zones pour exclure celle scannée
+                                    const updatedZones = currentTourData.zones.filter(zone => zone.planTourId !== planTourId);
+                                    if(updatedZones.length > 0)
+                                    {
+                                    // Mettre à jour l'enregistrement dans toursData avec le nouveau tableau de zones
+                                    // Utiliser update() est légèrement plus sémantique ici
+                                    await db.toursData.update(tourId, { zones: updatedZones });
+                                    console.log(`toursData pour tourId ${tourId} mis à jour. ${updatedZones.length} zone(s) restante(s) localement.`);
+                                    }else {
+                                        await db.toursData.delete(tourId)
+                                        console.log(`toursData pour tourId ${tourId} supprimé en local`);
+                                    }
+                                }else {
+                                    console.warn(`Impossible de trouver les données (ou les zones) de la tournée ${tourId} dans toursData pour la mise à jour après scan.`);
+                                }
+                        // 4f. Essayer d'enregistrer pour Background Sync via le Service Worker
+                        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+                            try {
+                                const registration = await navigator.serviceWorker.ready;
+                                // Enregistrer un tag de synchro - le SW écoute ce tag
+                                await registration.sync.register('sync-pending-scans');
+                                console.log('Tag de synchronisation "sync-pending-scans" enregistré.');
+                            } catch (syncErr) {
+                                console.error('Échec de l\'enregistrement Background Sync:', syncErr);
+                                // La synchro se fera peut-être au prochain chargement/activation du SW
+                            }
+                        } else {
+                            console.warn("Background Sync n'est pas supporté. La synchro dépendra du rechargement/activation du SW.");
+                        }
+
+                        // 4g. Redirection vers la liste des zones (après succès local)
+                        window.location.href = `/Agent/DebutTour/${tourId}`; // Redirection JavaScript
+
+                    } catch (error) {
+                        console.error("Erreur lors de l'enregistrement du scan :", error);
+                        alert("Une erreur est survenue lors de l'enregistrement du pointage local.");
+                        html5QrCode.resume(); // Assurer que le scan reprend en cas d'erreur
+                    }
+            }
+
+        } catch (error) {
+                console.error("Erreur lors du traitement du scan :", error);
+                alert("Une erreur est survenue lors du traitement du scan.");
+                html5QrCode.resume(); // Assurer que le scan reprend en cas d'erreur
+            }
+
+        };
+
+        // --- Callback en cas d'erreur du scanner (inchangé) ---
+        const qrCodeErrorCallback = (error) => {
+             // console.warn(`Erreur de scan: ${error}`); // Peut être bruyant, décommenter si besoin
+        };
+
+        // --- Démarrage du Scanner (inchangé mais avec gestion erreur améliorée) ---
+        try {
+             console.log("Tentative de démarrage du scanner (caméra arrière)...");
+             await html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback, qrCodeErrorCallback);
+             console.log("Scanner démarré (caméra arrière).");
+         } catch (err) {
+             console.error("Échec démarrage caméra arrière, essai autre caméra:", err);
+             try {
+                 const cameras = await Html5Qrcode.getCameras();
+                 if (cameras && cameras.length > 0) {
+                     const cameraId = cameras.find(c => c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('rear'))?.id || cameras[0].id;
+                     console.log(`Tentative de démarrage avec caméra ID: ${cameraId}`);
+                     await html5QrCode.start(cameraId, config, qrCodeSuccessCallback, qrCodeErrorCallback);
+                     console.log("Scanner démarré (caméra sélectionnée).");
+                 } else {
+                         console.error("Aucune caméra trouvée.");
+                         readerDiv.innerHTML = '<p class="alert alert-danger">Aucune caméra détectée. Vérifiez les permissions.</p>';
+                 }
+             } catch (fallbackErr) {
+                 console.error("Échec du démarrage d'une autre caméra:", fallbackErr);
+                 readerDiv.innerHTML = '<p class="alert alert-danger">Impossible de démarrer le lecteur de code QR. Vérifiez les permissions de la caméra.</p>';
+             }
+         }
+
+    }); // Fin DOMContentLoaded
+
+
+</script>

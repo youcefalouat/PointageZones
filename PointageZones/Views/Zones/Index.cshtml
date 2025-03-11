@@ -1,0 +1,69 @@
+﻿@model IEnumerable<PointageZones.Models.Zone>
+
+@{
+    ViewData["Title"] = "Index";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    
+}
+
+<br />
+
+<p>
+    <a asp-action="Create" class="btn btn-success">Créer Nouvelle Zone</a>
+</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.RefZone)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Type)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.lastUpdate)
+            </th>
+            <th>
+                Générer code QR
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+    
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.RefZone)
+                    <input type="hidden" id="lastUpdate" value=@item.lastUpdate />
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Type)
+            </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.lastUpdate)
+                </td>
+            <td>
+                <div class="d-flex flex-column flex-md-row gap-2">
+                        <a asp-action="DownloadQRCode" asp-route-id="@item.Id" onclick="return alertTag('@item.lastUpdate.ToString()');"
+                           class="btn btn-primary">Générer</a>
+                    <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-primary">Details</a>  
+                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-warning">Modifier</a> 
+                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-danger">Supprimer</a>
+                </div>            
+            </td>
+        </tr>
+}
+    </tbody>
+</table>
+
+
+<script>
+    function alertTag(lastUpdateDate) {
+        // Use confirm() instead of alert() to allow cancellation
+        var confirmation = confirm("Le code QR va générer un nouveau Tag. Le dernier a été créé le " + lastUpdateDate + ".\nVoulez-vous continuer ?");
+        // If the user clicks "Cancel", prevent the link navigation
+        return confirmation;
+    }
+
+</script>

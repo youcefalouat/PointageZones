@@ -1,0 +1,24 @@
+﻿@model PointageZones.Controllers.UsersController.UserRoleViewModel
+
+<h1>User Details</h1>
+<hr />
+<div>
+    <dl class="row">
+        <dt class="col-sm-2">Nom</dt>
+        <dd class="col-sm-10">@Model.User.Nom</dd>
+
+        <dt class="col-sm-2">Prénom</dt>
+        <dd class="col-sm-10">@Model.User.Prenom</dd>
+
+        <dt class="col-sm-2">Nom d'utilisateur</dt>
+        <dd class="col-sm-10">@Model.User.UserName</dd>
+
+        <dt class="col-sm-2">Rôle</dt>
+        <dd class="col-sm-10">@Model.Role</dd>
+    </dl>
+</div>
+
+<div>
+    <a asp-action="Edit" asp-route-id="@Model.User.Id" class="btn btn-primary">Modifier</a>
+    <a asp-action="Index" class="btn btn-secondary">Retour à la liste</a>
+</div>

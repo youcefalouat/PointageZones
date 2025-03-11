@@ -1,0 +1,40 @@
+﻿<div class="card p-4 shadow">
+    <h4 class="fw-bold">
+        Référence de la tournée :
+        <span class="text-success">@Model.</span>
+    </h4>
+
+    <div class="alert alert-info mt-3">
+        <i class="bi bi-info-circle"></i> Cette tournée comporte @Model.PlanTours.Count zones à visiter.
+    </div>
+
+    <form asp-action="AssignTour" method="post">
+        <input type="hidden" name="tourId" value="@Model.TourId" />
+
+        @foreach (var planTour in Model.PlanTours)
+        {
+            <input type="hidden" name="planTours[@(Model.PlanTours.IndexOf(planTour))].TourId" value="@planTour.TourId" />
+            <input type="hidden" name="planTours[@(Model.PlanTours.IndexOf(planTour))].ZoneId" value="@planTour.ZoneId" />
+        }
+
+        <div class="form-group mt-3">
+            <label class="form-label">Sélectionner un agent :</label>
+            <select name="username" class="form-select" required>
+                <option value="">-- Choisir un agent --</option>
+                @foreach (var user in Model.Users)
+                {
+                    <option value="@user.Value">@user.Text</option>
+                }
+            </select>
+        </div>
+
+        <div class="d-flex justify-content-between mt-4">
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Retour
+            </a>
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> Confirmer l'affectation
+            </button>
+        </div>
+    </form>
+</div>

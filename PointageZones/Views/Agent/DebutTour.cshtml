@@ -1,0 +1,318 @@
+﻿@model IEnumerable<PointageZones.Models.PlanTour>
+@{
+    ViewData["Title"] = "Début Pointage";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+
+    // Variables avec initialisation sécurisée
+    var isOfflineMode = ViewBag.IsOfflineMode as bool? ?? false;
+    var tour = ViewBag.Tour as PointageZones.Models.Tour;
+    var users = ViewBag.Users as IEnumerable<string> ?? Enumerable.Empty<string>();
+
+    // Données de la tournée avec vérification de null
+    var tourId = tour?.Id ?? ViewBag.TourId;
+    var tourRef = tour?.RefTour ?? "N/A";
+}
+
+<div id="toastContainer" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+
+<div class="container mt-4">
+    <h2 class="text-center text-primary">Début de Pointage</h2>
+    <hr />
+
+    <div class="card p-4 shadow">
+        <h4 class="fw-bold">
+            ID de la tournée :
+            <input type="hidden" id="tour_Id" value="@tourId" />
+            <span id="tour_Id" value="@tourId" class="text-success">@tourId</span>
+        </h4>
+        <h4 class="fw-bold">
+            Référence de la tournée :
+            <input type="hidden" id="tourRef" value="@tourRef" />
+            <span id="tourRef" value="@tourRef" class="text-success">@tourRef</span>
+
+        </h4>
+        <div id="refTour"></div>
+        @*
+        // @@if (User.IsInRole("chef") || (User.IsInRole("admin")))
+        // {
+        //     <form asp-action="AssignTour" method="post" class="mt-4">
+        //         <input type="hidden" id="tourId" value="@tourId" />
+
+        //         <div class="form-group">
+        //             <label class="form-label">Sélectionner un agent :</label>
+        //             <select name="username" class="form-select" required>
+        //                 <option value="">-- Choisir un agent --</option>
+        //                 @foreach (var user in @ViewBag.Users)
+        //                 {
+        //                     <option value="@user">@user</option>
+        //                 }
+        //             </select>
+        //         </div>
+
+        //         <button type="submit" class="btn btn-success mt-3">
+        //             <i class="bi bi-person-check"></i> Assigner Tournée
+        //         </button>
+        //     </form>
+        // }*@
+        <div class="mt-4">
+            <h5 class="text-secondary">Zones à pointer :</h5>
+            
+            @* Le conteneur pour la liste dynamique *@
+            <div id="zoneListContainer" class="mt-2">
+                <p><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Chargement des zones...</p>
+            </div>
+        </div>
+       
+    </div>
+</div>
+
+
+
+@if (User.IsInRole("user"))
+{//script pour agent
+    <script>
+
+                document.addEventListener('DOMContentLoaded', async () => {
+
+
+            const tourIdInput = document.getElementById('tour_Id');
+            const tourRefSpan = document.getElementById('tourRef');
+            const zoneListContainer = document.getElementById('zoneListContainer');
+            const offlineNotice = document.getElementById('offlineNotice');
+
+            // Fonction pour afficher une notification Bootstrap Toast
+            function showToast(message, type = 'success') {
+                const toastContainer = document.getElementById('toastContainer');
+                if (!toastContainer) {
+                    console.error("Pas de conteneur de toast trouvé !");
+                    return;
+                }
+
+                const toastHtml = `
+                    <div class="toast align-items-center text-bg-${type} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="d-flex">
+                            <div class="toast-body">${message}</div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                `;
+                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+                const toastEl = toastContainer.lastElementChild;
+                const bsToast = new bootstrap.Toast(toastEl);
+                bsToast.show();
+
+                // Nettoyer l'ancien toast une fois fermé
+                toastEl.addEventListener('hidden.bs.toast', () => {
+                    toastEl.remove();
+                });
+            }
+
+            // --- Récupérer et valider Tour ID ---
+            if (!tourIdInput || !tourIdInput.value || tourIdInput.value === "0") {
+                console.error("Input currentTourId non trouvé ou invalide !", tourIdInput?.value);
+                zoneListContainer.innerHTML = '<p class="text-danger">Erreur : ID de tournée manquant ou invalide.</p>';
+                if(tourRefSpan) tourRefSpan.textContent = "Erreur";
+                return;
+            }
+
+            const tourId = parseInt(tourIdInput.value, 10);
+            if (isNaN(tourId)) {
+                console.error("Tour ID n'est pas un nombre valide:", tourIdInput.value);
+                zoneListContainer.innerHTML = '<p class="text-danger">Erreur : ID de tournée invalide.</p>';
+                if(tourRefSpan) tourRefSpan.textContent = "Erreur";
+                return;
+            }
+            console.log("Tour ID:", tourId);
+
+            // --- Vérifier accès DB ---
+            if (!window.pointageDB) {
+                console.error("DB (pointageDB via Dexie) non trouvée !");
+                zoneListContainer.innerHTML = '<p class="text-danger">Erreur : Base de données locale non initialisée.</p>';
+                return; // Bloquant pour la logique offline/online
+            }
+            const db = window.pointageDB;
+            console.log("Instance DB:", db);
+
+            // --- Fonction de synchronisation directe ---
+            async function syncPendingScansDirect() {
+                try {
+                    const pendingScans = await db.pendingScans.toArray();
+
+                    if (pendingScans.length === 0) {
+                        console.log("Aucun scan en attente à synchroniser.");
+                        return;
+                    }
+
+                    console.log(`Nombre de scans en attente : ${pendingScans.length}`);
+
+                    let successCount = 0;
+                    let failCount = 0;
+
+                    for (const scan of pendingScans) {
+                        try {
+                            const response = await fetch('/Agent/ValiderQRCode', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    qrCodeText: scan.qrCodeText,
+                                    PlanTourId: scan.planTourId,
+                                    datetimescan: scan.timestamp,
+                                    PointageId: scan.pointageId
+                                })
+                            });
+
+                            if (response.ok) {
+                                console.log(`Scan ${scan.pointageId} synchronisé avec succès.`);
+                                await db.pendingScans.delete(scan.pointageId);
+                                console.log(`Scan ID local ${scan.pointageId} supprimé.`);
+                                successCount++;
+                            } else {
+                                console.error(`Erreur serveur pour le scan ${scan.pointageId}`, response.statusText);
+                                failCount++;
+                            }
+                        } catch (error) {
+                            console.error(`Erreur réseau/serveur pour le scan ${scan.pointageId}:`, error);
+                            failCount++;
+                        }
+                    }
+
+                    if (successCount > 0) {
+                        showToast(`Synchronisation terminée : ${successCount} scan(s) synchronisé(s)${failCount > 0 ? `, ${failCount} échec(s)` : ''}`);
+                    } else if (failCount > 0) {
+                        showToast(`Échec de synchronisation : ${failCount} scan(s) non synchronisé(s)`, "danger");
+                    }
+                } catch (e) {
+                    console.error("Erreur pendant la synchronisation :", e);
+                    showToast("Erreur lors de la synchronisation", "danger");
+                }
+            }
+
+            // Synchroniser quand connexion Internet revient
+            window.addEventListener('online', () => {
+                console.log("Connexion détectée. Tentative de synchronisation des scans...");
+                syncPendingScansDirect();
+            });
+
+            // Synchroniser dès le chargement si on est en ligne
+            if (navigator.onLine) {
+                console.log("App déjà en ligne. Tentative de synchronisation immédiate.");
+                await syncPendingScansDirect();
+            }
+
+            // --- Gestion état Online/Offline pour l'UI ---
+            const updateOnlineStatusUI = () => {
+                const currentlyOnline = navigator.onLine;
+                if (offlineNotice) {
+                    offlineNotice.style.display = currentlyOnline ? 'none' : 'block';
+                }
+                console.log(`Statut connexion (UI): ${currentlyOnline ? 'En ligne' : 'Hors ligne'}`);
+            };
+            window.addEventListener('online', updateOnlineStatusUI);
+            window.addEventListener('offline', updateOnlineStatusUI);
+            updateOnlineStatusUI(); // Appeler une fois au début pour l'état initial
+
+            let displayedFromDB = false;
+
+            // --- Fonction pour Afficher la Liste ---
+            function renderZoneList(zones, container, tourId) {
+                if (!container) return;
+                if (!zones || zones.length === 0) {
+                    container.innerHTML = '<p class="text-info">Aucune zone à pointer pour cette tournée.</p>';
+                    return;
+                }
+
+                let listHtml = '<ul class="list-group list-group-flush">';
+                zones.forEach(zone => {
+                    const scanUrl = `/Agent/ScannerQRCode/${zone.planTourId}`;
+                    listHtml += `<li class="list-group-item d-flex justify-content-between align-items-center ps-0 pe-0">
+                        <div><i class="bi bi-geo-alt-fill text-secondary me-2"></i>
+                        <span class="fw-bold">${zone.refZone || 'Zone inconnue'}</span></div>
+                        <a href="${scanUrl}" class="btn btn-primary btn-sm scanQrCodeBtn"
+                           data-plantour-id="${zone.planTourId}" data-zone-ref="${zone.refZone}">
+                           <i class="bi bi-qr-code-scan"></i> Scanner</a>
+                        </li>`;
+                });
+                listHtml += '</ul>';
+                container.innerHTML = listHtml;
+            }
+
+            // --- Fonction Principale pour Charger/Afficher ---
+            async function loadAndDisplayData() {
+                displayedFromDB = false;
+                if (!zoneListContainer) return;
+                zoneListContainer.innerHTML = '<p><span class="spinner-border spinner-border-sm"></span> Chargement...</p>';
+
+                // Essayer d'abord de charger depuis IndexedDB
+                try {
+                    console.log("Lecture IndexedDB pour tourId:", tourId);
+                    const cachedTourData = await db.toursData.get(tourId);
+                    if (cachedTourData) {
+                        console.log("Affichage initial depuis IndexedDB:", cachedTourData);
+                        if (tourRefSpan) tourRefSpan.textContent = cachedTourData.refTour;
+
+                        renderZoneList(cachedTourData.zones, zoneListContainer, tourId);
+                        displayedFromDB = true;
+                    } else {
+                        console.log("Aucune donnée locale pour tourId:", tourId);
+                        zoneListContainer.innerHTML = '<p>Tentative de chargement depuis le serveur...</p>';
+                    }
+                } catch (dbError) {
+                    console.error("Erreur lecture IndexedDB:", dbError);
+                }
+
+                // Ensuite tenter de rafraîchir depuis le serveur
+                try {
+                    const response = await fetch(`/Agent/GetTourDetails?tourId=${tourId}`);
+                    console.log("Réponse Fetch reçue, Statut:", response.status);
+
+                    if (!response.ok) {
+                        let errorMsg = `Erreur ${response.status}: ${response.statusText}`;
+                        try {
+                            const errorData = await response.json();
+                            errorMsg = errorData.message || errorMsg;
+                        } catch(e) {}
+                        console.error("Fetch API a échoué:", errorMsg);
+                        throw new Error(errorMsg);
+                    }
+
+                    const freshTourData = await response.json();
+                    console.log("Données API reçues:", freshTourData);
+
+                    if (!freshTourData || !freshTourData.tourId || !Array.isArray(freshTourData.zones)) {
+                        throw new Error("Format de données API incorrect.");
+                    }
+
+                    console.log("Sauvegarde IndexedDB...");
+                    await db.toursData.put(freshTourData);
+                    console.log("SUCCÈS : IndexedDB mis à jour, tourId:", tourId);
+
+                    // MAJ affichage avec données fraîches
+                    if (tourRefSpan) tourRefSpan.textContent = freshTourData.refTour;
+                    renderZoneList(freshTourData.zones, zoneListContainer, tourId);
+
+                } catch (fetchError) {
+                    console.error("ERREUR lors du fetch/save API:", fetchError);
+                    if (!displayedFromDB) {
+                        // Si on n'avait rien pu afficher depuis IndexedDB et que le fetch échoue
+                        zoneListContainer.innerHTML = `<p class="text-danger">Aucune zone à vérifié ou chargé. Vérifiez votre connexion ou réessayez plus tard.</p>`;
+                        if (tourRefSpan) tourRefSpan.textContent = "Erreur";
+                    } else {
+                        // On avait affiché depuis DB, le fetch a échoué. On laisse les données locales.
+                        console.log("Fetch échoué, les données affichées proviennent d'IndexedDB (possiblement anciennes).");
+                        showToast("Impossible de rafraîchir les données depuis le serveur", "warning");
+                    }
+                }
+            }
+
+            // --- Appel Initial ---
+            await loadAndDisplayData();
+             // Minimal auto-refresh:
+        setInterval(() => {
+            loadAndDisplayData().catch(console.error);
+            window.location.reload(true);
+        }, 60000);
+        });
+
+    </script>
+}

@@ -1,0 +1,76 @@
+﻿@* @model PointageZones.Models.PlanTour
+
+@{
+    ViewData["Title"] = "Edit";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<h1>Edit</h1>
+
+<h4>PlanTour</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Edit">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="Id" />
+            <div class="form-group">
+                <label asp-for="TourId" class="control-label"></label>
+                <select asp-for="TourId" class="form-control" asp-items="ViewBag.TourId">
+                    <option disabled selected value="">-- Sélectionner une tournée --</option>
+                </select>
+                <span asp-validation-for="TourId" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="ZoneId" class="control-label"></label>
+                <select asp-for="ZoneId" class="form-control" asp-items="ViewBag.ZoneId">
+                    <option disabled selected value="">-- Sélectionner une zone --</option>
+                </select>
+                <span asp-validation-for="ZoneId" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Save" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
+ *@
+
+@model PointageZones.Models.Tour
+
+<h2>Modifier le Tour</h2>
+
+<a asp-controller="Tours" asp-action="Index" class="btn btn-primary">Retour à la liste</a>
+<form asp-action="Edit" method="post">
+    <input type="hidden" asp-for="Id" />
+
+    <div class="form-group">
+        <label asp-for="RefTour" class="control-label"></label>
+        <input asp-for="RefTour" class="form-control" disabled />
+    </div>
+
+    <div class="form-group">
+        <label for="zones">Zones affectées</label>
+        <div class="form-check">
+            @foreach (var zone in ViewBag.Zones)
+            {
+                <div class="form-check">
+                    <input type="checkbox" name="ZoneIds" value="@zone.Value"
+                    @(zone.Selected ? "checked" : "") class="form-check-input" id="zone_@zone.Value">
+                    <label class="form-check-label" for="zone_@zone.Value">@zone.Text</label>
+                </div>
+            }
+        </div>
+    </div>
+   <br /> 
+    <br />
+    <button type="submit" class="btn btn-primary">Enregistrer</button>
+</form>
