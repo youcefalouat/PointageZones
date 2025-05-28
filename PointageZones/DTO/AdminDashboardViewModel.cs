@@ -21,13 +21,14 @@ namespace PointageZones.DTO
 
     public class UtilisateurPointageDto
     {
-        public string UtilisateurId { get; set; }
+        public  required string UtilisateurId { get; set; }
         public int Nombre { get; set; }
     }
 
     public class PlanTourneeRatioDto
     {
-        public string PlanTourneeId { get; set; }
+        public int PlanTourneeId { get; set; }
+        public string? refTour { get; set; }
         public int Effectue { get; set; }
         public int Total { get; set; }
     }

@@ -66,7 +66,7 @@ namespace PointageZones.Controllers
                             {
                                 title = "Tournée Active",
                                 body = $"La tournée ({tourRef}) est active. Démarrage en cours.",
-                                url = Url.Action("DebutTour", "Tours", new { id = tourId }, Request.Scheme),
+                                url = Url.Action("DebutTour", "Agent", new { id = tourId }, Request.Scheme),
                                 icon = "/images/logo_mini_s_192x192.png",
                                 data = new
                                 {
@@ -91,7 +91,7 @@ namespace PointageZones.Controllers
                             }
 
 
-                            return RedirectToAction("DebutTour", new { id = pointage.PlanTour.TourId });
+                            return RedirectToAction("DebutTour","Agent" ,new { id = pointage.PlanTour.TourId });
                             }
                         
                     }
@@ -422,7 +422,8 @@ namespace PointageZones.Controllers
                         && p.DateTimeDebTour == debTour
                         && p.DateTimeFinTour == finTour
                         && p.IsChecked == 0
-                        && p.IsValid == 0).FirstOrDefaultAsync();
+                        && p.IsValid == 0)
+                 .ToListAsync();
 
                 if (pointages != null)
                 {
@@ -431,11 +432,14 @@ namespace PointageZones.Controllers
                     {
                         try
                         {
-                            pointages.Ref_User_Update = userObs.UserName;
-                            pointages.ObservationId = observation;
-                            pointages.Last_Update = DateTime.Now;
-
-                            _context.Update(pointages);
+                            foreach(var item in pointages)
+                            {
+                                item.Ref_User_Update = userObs.UserName;
+                                item.ObservationId = observation;
+                                item.Last_Update = DateTime.Now;
+                                _context.Update(item);
+                            }
+                                                        
                             await _context.SaveChangesAsync();
                             await transaction.CommitAsync();
 
@@ -513,24 +517,42 @@ namespace PointageZones.Controllers
                     {
                         foreach (var item in tour.PlanTours)
                         {
-                            var pointage = new PointageAgent
+                            // Check if a pointage already exists with the same PlanTourId, DateTimeDebTour and DateTimeFinTour
+                            var existingPointage = await _context.Pointages.FirstOrDefaultAsync(p =>
+                                p.PlanTourId == item.Id &&
+                                p.DateTimeDebTour == debTour &&
+                                p.DateTimeFinTour == finTour);
+
+                            if (existingPointage != null)
                             {
-                                UserId = username,
-                                User = user,
-                                PlanTourId = item.Id,
-                                PlanTour = item,
-                                IsChecked = 0,
-                                DateTimeScan = null,
-                                DateTimeAssign = DateTime.Now,
-                                DateTimeDebTour = debTour,
-                                DateTimeFinTour = finTour,
-                                Ref_User_Assign = userAssign?.UserName,
-                                Last_Update = DateTime.Now,
-                            };
+                                // Update existing pointage
+                                existingPointage.UserId = username;
+                                existingPointage.User = user;
+                                existingPointage.Ref_User_Assign = userAssign?.UserName;
+                                existingPointage.Last_Update = DateTime.Now;
 
-                            _context.Pointages.Add(pointage);
+                                _context.Pointages.Update(existingPointage);
+                            }
+                            else
+                            {
+                                var pointage = new PointageAgent
+                                {
+                                    UserId = username,
+                                    User = user,
+                                    PlanTourId = item.Id,
+                                    PlanTour = item,
+                                    IsChecked = 0,
+                                    DateTimeScan = null,
+                                    DateTimeAssign = DateTime.Now,
+                                    DateTimeDebTour = debTour,
+                                    DateTimeFinTour = finTour,
+                                    Ref_User_Assign = userAssign?.UserName,
+                                    Last_Update = DateTime.Now,
+                                };
+
+                                _context.Pointages.Add(pointage);
+                            }
                         }
-
                         // Save all changes to the database
                         await _context.SaveChangesAsync();
                         await transaction.CommitAsync();
@@ -696,7 +718,7 @@ namespace PointageZones.Controllers
 
                 // 🔍 Récupérer le temps debut de la tournée en cours
                 DateTime? lastTour = await TourActuelleAsync(id);
-                
+
                 if (lastTour == null)
                 {
                     return new checkTourPointee
@@ -704,15 +726,19 @@ namespace PointageZones.Controllers
                         success = false,
                         message = $"Exception lastTour pour {tour.RefTour}.",
                         tourPointee = false,
-                        
+
                     };
                 }
 
                 if (lastTour == DateTime.MinValue)
                 {
-                    return new checkTourPointee { success = true, message = $"Aucune tournée en cours pour {tour.RefTour}. Veuillez attendre jusqu'au {tour.DebTour}", tourPointee = false,
+                    return new checkTourPointee
+                    {
+                        success = true,
+                        message = $"Aucune tournée en cours pour {tour.RefTour}. Veuillez attendre jusqu'au {tour.DebTour}",
+                        tourPointee = false,
                         currentTourTime = tour.DebTour.ToString("HH:mm"),
-                        };
+                    };
                 }
 
                 // 🔍 Récupérer les zones associées à cette tournée
@@ -726,7 +752,6 @@ namespace PointageZones.Controllers
                     return new checkTourPointee { success = false, message = "Aucune zone définie pour cette tournée.", tourPointee = false };
                 }
 
-                
                 // 🔥 Si aucune fréquence n'est définie (tour unique)
                 if (tour.FrqTourMin == 0 || tour.FrqTourMin == null)
                 {
@@ -788,7 +813,7 @@ namespace PointageZones.Controllers
                                 zonesTournee.Contains(p.PlanTour.ZoneId) &&
                                 p.DateTimeDebTour >= lastTour.Value &&
                                 p.DateTimeFinTour <= nextTour &&
-                                p.IsChecked == 0)
+                                (p.IsChecked == 0 || p.DateTimeAssign != null))
                     .Select(p => p.PlanTour.ZoneId)
                     .Distinct()
                     .ToListAsync();
@@ -822,7 +847,7 @@ namespace PointageZones.Controllers
                 // ⏳ Calcul du temps restant avant la prochaine tournée
                 TimeSpan diff = nextTour.Value - DateTime.Now;
 
-                
+
                 int diffHours = (int)diff.TotalHours;
                 int diffMinutes = diff.Minutes;
 
@@ -856,8 +881,249 @@ namespace PointageZones.Controllers
                 return Json(result);
             }
         }
+        //private async Task<checkTourPointee> checkTourPointee(int? id)
+        //{
+        //    try
+        //    {
+        //        // 🔍 Récupération du rôle utilisateur
+        //        var role = User.FindFirstValue(ClaimTypes.Role);
+        //        bool isAdminOrChef = role == "admin" || role == "chef";
 
-        
+        //        // 🔍 Validation et récupération de la tournée
+        //        var tour = await _context.Tours.FirstOrDefaultAsync(m => m.Id == id);
+        //        if (tour == null)
+        //        {
+        //            return CreateErrorResponse("Tournée introuvable.");
+        //        }
+
+        //        // 🔍 Récupération du temps de début de la tournée en cours
+        //        DateTime? lastTour = await TourActuelleAsync(id);
+
+        //        if (lastTour == null)
+        //        {
+        //            return CreateErrorResponse($"Exception lastTour pour {tour.RefTour}.");
+        //        }
+
+        //        if (lastTour == DateTime.MinValue)
+        //        {
+        //            return new checkTourPointee
+        //            {
+        //                success = true,
+        //                message = $"Aucune tournée en cours pour {tour.RefTour}. Veuillez attendre jusqu'au {tour.DebTour}",
+        //                tourPointee = false,
+        //                currentTourTime = tour.DebTour.ToString("HH:mm")
+        //            };
+        //        }
+
+        //        // 🔍 Récupération des zones de la tournée
+        //        var zonesTournee = await _context.PlanTours
+        //            .Where(pt => pt.TourId == id)
+        //            .Select(pt => pt.ZoneId)
+        //            .ToListAsync();
+
+        //        if (!zonesTournee.Any())
+        //        {
+        //            return CreateErrorResponse("Aucune zone définie pour cette tournée.");
+        //        }
+
+        //        // 🔥 Gestion des tournées uniques (sans fréquence)
+        //        if (tour.FrqTourMin <= 0 || tour.FrqTourMin == null )
+        //        {
+        //            return await HandleSingleTourAsync(id, zonesTournee, lastTour.Value, tour, isAdminOrChef);
+        //        }
+
+        //        // 🔍 Gestion des tournées récurrentes
+        //        return await HandleRecurringTourAsync(id, zonesTournee, lastTour.Value, tour, isAdminOrChef);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError(ex, "Erreur lors de la vérification du pointage pour la tournée ID {Id}", id);
+        //        return CreateErrorResponse("Une erreur est survenue. Veuillez réessayer.");
+        //    }
+        //}
+
+        //private async Task<checkTourPointee> HandleSingleTourAsync(int? id, List<int> zonesTournee, DateTime lastTour, Tour tour, bool isAdminOrChef)
+        //{
+        //    var today = DateTime.Now.Date;
+        //    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        //    // Récupération optimisée des pointages pour tournée unique
+        //    var pointages = await _context.Pointages
+        //        .Where(p => p.PlanTour.TourId == id &&
+        //                   zonesTournee.Contains(p.PlanTour.ZoneId) &&
+        //                   ((p.DateTimeScan.HasValue &&
+        //                     p.DateTimeScan >= lastTour &&
+        //                     p.DateTimeScan.Value.Date == today) ||
+        //                    (p.DateTimeDebTour.HasValue &&
+        //                     p.DateTimeDebTour >= lastTour &&
+        //                     p.DateTimeDebTour.Value.Date == today)))
+        //        .Select(p => new {
+        //            ZoneId = p.PlanTour.ZoneId,
+        //            UserId = p.UserId,
+        //            IsScanned = p.DateTimeScan.HasValue && p.IsChecked == 1 &&
+        //                       p.DateTimeScan >= lastTour && p.DateTimeScan.Value.Date == today,
+        //            IsAssigned = p.DateTimeDebTour.HasValue && p.IsChecked == 0 &&
+        //                        p.DateTimeDebTour >= lastTour && p.DateTimeDebTour.Value.Date == today
+        //        })
+        //        .ToListAsync();
+
+        //    var zonesPointees = pointages.Where(p => p.IsScanned).Select(p => p.ZoneId).Distinct().ToList();
+        //    var hasAssignedZones = pointages.Any(p => p.UserId == currentUserId && p.IsAssigned);
+        //    var tourPointee = zonesTournee.All(zoneId => zonesPointees.Contains(zoneId));
+
+        //    return new checkTourPointee
+        //    {
+        //        success = true,
+        //        message = tourPointee
+        //            ? "Toutes les zones ont été pointées, pas de tournée restante aujourd'hui."
+        //            : "Certaines zones n'ont pas été pointées, la tournée est incomplète.",
+        //        tourPointee = tourPointee,
+        //        zonePointée = zonesPointees,
+        //        currentTourTime = tour.DebTour.ToString("HH:mm"),
+        //        nextTourTime = "Tournée Faite",
+        //        tourAssigné = isAdminOrChef ? true : hasAssignedZones
+        //    };
+        //}
+
+        //private async Task<checkTourPointee> HandleRecurringTourAsync(int? id, List<int> zonesTournee, DateTime lastTour, Tour tour, bool isAdminOrChef)
+        //{
+        //    var nextTour = lastTour.AddMinutes(tour.FrqTourMin.Value);
+
+        //    // 🔥 Vérification si la prochaine tournée dépasse l'heure de fin
+        //    if (tour.FinTour.HasValue && IsNextTourAfterEndTime(tour, nextTour))
+        //    {
+        //        var (tourComplete, zonesPointees, hasAssigned) = await GetTourStatusAsync(id, zonesTournee, lastTour, nextTour, isAdminOrChef);
+
+        //        return new checkTourPointee
+        //        {
+        //            success = false,
+        //            message = tourComplete
+        //                ? "Toutes les tournées sont terminées pour aujourd'hui."
+        //                : "La dernière tournée n'a pas été complétée avant la fin prévue.",
+        //            tourPointee = tourComplete,
+        //            currentTourTime = tour.DebTour.ToString("HH:mm"),
+        //            nextTourTime = "Tournée Faite",
+        //            tourAssigné = isAdminOrChef ? true : hasAssigned // true pour admin/chef, logique normale pour autres
+        //        };
+        //    }
+
+        //    // 🔍 Récupération du statut de la tournée actuelle
+        //    var (isComplete, pointedZones, hasAssignedZones) = await GetTourStatusAsync(id, zonesTournee, lastTour, nextTour, isAdminOrChef);
+
+        //    // ⏳ Calcul du temps restant
+        //    var countdown = CalculateCountdown(nextTour);
+
+        //    return new checkTourPointee
+        //    {
+        //        success = !isComplete,
+        //        message = isComplete
+        //            ? "Tournée complétée, prochaine tournée à venir."
+        //            : "Certaines zones n'ont pas été pointées, en attente de validation.",
+        //        currentTourTime = lastTour.ToString("HH:mm"),
+        //        nextTourTime = nextTour.ToString("HH:mm"),
+        //        countdown = countdown,
+        //        tourPointee = isComplete,
+        //        zonePointée = pointedZones,
+        //        tourAssigné = isAdminOrChef ? true : hasAssignedZones // true pour admin/chef, logique normale pour autres
+        //    };
+        //}
+
+        //private async Task<(bool IsComplete, List<int> ZonesPointees, bool HasAssigned)> GetTourStatusAsync(
+        //    int? id, List<int> zonesTournee, DateTime startTime, DateTime endTime, bool isAdminOrChef)
+        //{
+        //    // 🔐 Pour les admin/chef, récupération simplifiée (pas besoin de vérifier les assignations)
+        //    if (isAdminOrChef)
+        //    {
+        //        var zonesPointeesAdmin = await _context.Pointages
+        //            .Where(p => p.PlanTour.TourId == id &&
+        //                       zonesTournee.Contains(p.PlanTour.ZoneId) &&
+        //                       p.DateTimeScan.HasValue &&
+        //                       p.DateTimeScan >= startTime &&
+        //                       p.DateTimeScan <= endTime &&
+        //                       p.IsChecked == 1)
+        //            .Select(p => p.PlanTour.ZoneId)
+        //            .Distinct()
+        //            .ToListAsync();
+
+        //        var isComplete = zonesTournee.All(zoneId => zonesPointeesAdmin.Contains(zoneId));
+        //        return (isComplete, zonesPointeesAdmin, true); // Toujours assigné pour admin/chef
+        //    }
+
+        //    // Récupération de l'ID utilisateur actuel
+        //    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        //    // Logique complète pour les utilisateurs standards (vérifier les assignations réelles)
+        //    var pointages = await _context.Pointages
+        //        .Where(p => p.PlanTour.TourId == id &&
+        //                   zonesTournee.Contains(p.PlanTour.ZoneId) &&
+        //                   ((p.DateTimeScan.HasValue &&
+        //                     p.DateTimeScan >= startTime &&
+        //                     p.DateTimeScan <= endTime) ||
+        //                    (p.DateTimeDebTour.HasValue &&
+        //                     p.DateTimeFinTour.HasValue &&
+        //                     p.DateTimeDebTour >= startTime &&
+        //                     p.DateTimeFinTour <= endTime)))
+        //        .Select(p => new {
+        //            ZoneId = p.PlanTour.ZoneId,
+        //            UserId = p.UserId,
+        //            IsScanned = p.DateTimeScan.HasValue && p.IsChecked == 1 &&
+        //                       p.DateTimeScan >= startTime && p.DateTimeScan <= endTime,
+        //            IsAssigned = (p.IsChecked == 0 || p.DateTimeAssign.HasValue) 
+        //                        && p.DateTimeDebTour >= startTime && p.DateTimeFinTour <= endTime
+        //        })
+        //        .ToListAsync();
+
+        //    var zonesPointees = pointages.Where(p => p.IsScanned).Select(p => p.ZoneId).Distinct().ToList();
+
+        //    // Vérifier si l'utilisateur actuel est assigné à cette tournée
+        //    var isCurrentUserAssigned = pointages.Any(p => p.UserId == currentUserId && p.IsAssigned);
+
+        //    var isCompleteUser = zonesTournee.All(zoneId => zonesPointees.Contains(zoneId));
+
+        //    return (isCompleteUser, zonesPointees, isCurrentUserAssigned);
+        //}
+
+        //private static bool IsNextTourAfterEndTime(Tour tour, DateTime nextTour)
+        //{
+        //    if (!tour.FinTour.HasValue) return false;
+
+        //    var today = DateTime.Now.Date;
+        //    var finTourTime = today.Add(tour.FinTour.Value.ToTimeSpan());
+
+        //    // Gestion du passage après minuit
+        //    if (tour.FinTour.Value.Hour < tour.DebTour.Hour)
+        //    {
+        //        finTourTime = finTourTime.AddDays(1);
+        //    }
+
+        //    return nextTour > finTourTime;
+        //}
+
+        //private static string CalculateCountdown(DateTime nextTour)
+        //{
+        //    var diff = nextTour - DateTime.Now;
+        //    var hours = Math.Max(0, (int)diff.TotalHours);
+        //    var minutes = Math.Max(0, diff.Minutes);
+
+        //    return $"{hours:D2}:{minutes:D2}";
+        //}
+
+        //private static checkTourPointee CreateErrorResponse(string message)
+        //{
+        //    return new checkTourPointee
+        //    {
+        //        success = false,
+        //        message = message,
+        //        tourPointee = false
+        //    };
+        //}
+
+        //public async Task<IActionResult> Check(int? id)
+        //{
+        //    var result = await checkTourPointee(id);
+        //    return Json(result);
+        //}
+
         public async Task<DateTime?> TourAssignéAsync(int? id)
         {
             try
@@ -990,28 +1256,18 @@ namespace PointageZones.Controllers
             }
         }
 
-        public Task<IActionResult> ScannerQRCode(int id)
+        [HttpGet]
+        [Route("Agent/ScannerQRCode")]
+        public IActionResult ScannerQRCode(int? id)
         {
-            //ViewBag.ZoneId = id; // Passer l'ID de la zone à la vue
-            /*var planTour = await _context.PlanTours
-                .Include(pt => pt.Zone)
-                .FirstOrDefaultAsync(pt => pt.Id == id);
+            // Supprimer les en-têtes anti-cache par défaut
+            Response.Headers.Remove("Cache-Control");
+            Response.Headers.Remove("Pragma");
+            Response.Headers.Remove("Expires");
 
-            if (planTour == null)
-            {
-                TempData["Notification"] = "Erreur Plan de tournée ";
-                return View("Index"); ;
-            }
-            var TourId = planTour.TourId;
-            var ZoneId = planTour.ZoneId;
-
-            var RefZone = planTour.Zone.RefZone;
-
-            ViewBag.ZoneId = ZoneId;
-            ViewBag.TourId = TourId;
-            ViewBag.RefZone = RefZone;*/
-
-            return Task.FromResult<IActionResult>(View("qrCodePage"));
+            // Ajouter un cache privé de 60 secondes
+            Response.Headers["Cache-Control"] = "private, max-age=60";
+            return View("qrCodePage");
         }
 
         [HttpPost]
@@ -1126,6 +1382,7 @@ namespace PointageZones.Controllers
                             pointagesIncomplets.IsChecked = 1;
                             pointagesIncomplets.IsValid = (qrCodeTag != null && qrCodeTag == planTour.Zone.Tag) ? 1 : 0;
                             pointagesIncomplets.DateTimeScan = data.datetimescan.HasValue ? data.datetimescan.Value.AddHours(1) : DateTime.Now;
+                            pointagesIncomplets.ObservationId = null;
                             pointagesIncomplets.Last_Update = DateTime.Now;
 
                             _context.Update(pointagesIncomplets);

@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿@using System.Security.Claims
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -7,14 +8,14 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-	<link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0d6efd">
-	<link rel="stylesheet" href="~/PointageZones.styles.css" asp-append-version="true" />
-	
+    <link rel="stylesheet" href="~/PointageZones.styles.css" asp-append-version="true" />
+
 </head>
 <body>
-    
+
 
     <nav class="navbar navbar-expand-lg navbar-dark somepharm-color-dark p-1 pl-4">
         <a class="navbar-brand p-0" href="/">
@@ -35,16 +36,16 @@
                 }
                 @if (User.IsInRole("admin"))
                 {
-                <li class="nav-item">
-                    <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Admin" asp-action="Index">Accueil</a>
-                </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Admin" asp-action="Index">Accueil</a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Agent" asp-action="Index">Tournée Agents</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Agent" asp-action="TourDuJour">Détail des Tournées</a>
                     </li>
-                
+
                     <li class="nav-item">
                         <a class="nav-link text-white text-uppercase" asp-area="" asp-controller="Users" asp-action="Index">Gestion des Utilisateurs</a>
                     </li>
@@ -58,6 +59,15 @@
             </ul>
 
             <ul class="navbar-nav ms-auto">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <li class="nav-item">
+                        @* <h6 class="nav-link btn btn-link text-white text-uppercase">@User.Identity?.Name</h6> *@
+                        <form >
+                            <button class="nav-link btn btn-link text-white text-uppercase">@User.Identity?.Name</button>
+                        </form>
+                    </li>
+                }
                 <li class="nav-item">
                     <form asp-controller="Account" asp-action="Logout" method="post">
                         <button type="submit" class="nav-link btn btn-link text-white text-uppercase">Déconnexion</button>

@@ -179,10 +179,11 @@ public class AdminController : Controller
         // Calculate tourDuJourViewModels first
         // Then derive groupedByPlan from it:
         var groupedByPlan = tourDuJourViewModels
-            .GroupBy(t => t.TourRefTour ?? string.Empty) 
+            .GroupBy(t => t.TourId ) 
             .Select(g => new PlanTourneeRatioDto
             {
-                PlanTourneeId = g.Key, 
+                PlanTourneeId = g.Key,
+                refTour = g.First().TourRefTour,
                 Total = g.Count(),
                 Effectue = g.Count(t => t.tourFait)
             })

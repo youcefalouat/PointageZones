@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using PointageZones.Data;
 using PointageZones.Models;
 using QRCoder;
+using System.Drawing.Drawing2D;
 
 
 namespace PointageZones.Controllers
@@ -165,6 +166,8 @@ namespace PointageZones.Controllers
             return _context.Zones.Any(e => e.Id == id);
         }
 
+
+        
         
 
         public async Task<IActionResult> DownloadQRCodeAsync(int? id)
@@ -273,6 +276,88 @@ namespace PointageZones.Controllers
                     finalImage.Save(ms, ImageFormat.Png);
                     return File(ms.ToArray(), "image/png", $"{zoneRef}_QRCode.png");
                 }
+            }
+        }
+
+
+        public async Task<IActionResult> ImprimeQRCodeAsync(int? id)
+        {
+
+            if (id == null)
+            {
+                return NotFound();
+            }
+            var zone = await _context.Zones
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (zone != null)
+            {
+
+                string zoneRef = zone.RefZone;
+                string zoneQR = zone.Id + ";" + zone.Tag;
+
+                if (string.IsNullOrEmpty(zoneRef))
+                {
+                    return BadRequest("Invalid zone reference");
+                }
+
+                // Convert cm to pixels at 300 DPI (1 cm = 118.11 pixels at 300 DPI)
+                int widthInPixels = (int)(10 * 118.11);
+                int heightInPixels = (int)(5.8 * 118.11);
+
+                using (QRCodeGenerator qrGenerator = new QRCodeGenerator())
+                using (QRCodeData qrCodeData = qrGenerator.CreateQrCode(zoneQR, QRCodeGenerator.ECCLevel.Q))
+                using (QRCode qrCode = new QRCode(qrCodeData))
+                {
+                    // Create the base QR code image (we'll resize it later to fit our layout)
+                    using (Bitmap qrCodeImage = qrCode.GetGraphic(20))
+                    {
+                        // Define text properties
+                        Font font = new Font("Arial", 24, FontStyle.Bold); // Larger font for better visibility
+                        int textPadding = 10;
+
+                        // Calculate QR code size to fit in our layout (allowing space for text)
+                        int qrSize = Math.Min(widthInPixels, heightInPixels - 100); // Reserve 100px for text
+
+                        // Create the final image with our exact desired dimensions
+                        using (Bitmap finalImage = new Bitmap(widthInPixels, heightInPixels))
+                        using (Graphics graphics = Graphics.FromImage(finalImage))
+                        using (MemoryStream ms = new MemoryStream())
+                        {
+                            graphics.Clear(Color.White);
+                            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+                            // Resize and position the QR code to fit nicely in the layout
+                            int qrX = (widthInPixels - qrSize) / 2;
+                            graphics.DrawImage(qrCodeImage, qrX, 20, qrSize, qrSize);
+
+                            // Draw the text below the QR code
+                            StringFormat stringFormat = new StringFormat
+                            {
+                                Alignment = StringAlignment.Center,
+                                LineAlignment = StringAlignment.Near
+                            };
+
+                            Rectangle textRect = new Rectangle(
+                                20, // left margin
+                                qrSize + 20, // position below QR with some spacing
+                                widthInPixels - 40, // width with margins
+                                heightInPixels - qrSize - 0); // remaining height
+
+                            graphics.DrawString(zoneRef, font, Brushes.Black, textRect, stringFormat);
+
+                            // Save and return the image
+                            finalImage.Save(ms, ImageFormat.Png);
+                            return File(ms.ToArray(), "image/png", $"{zoneRef}_QRCode.png");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                return BadRequest("Invalid zone reference");
             }
         }
 

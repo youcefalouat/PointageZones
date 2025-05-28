@@ -22,13 +22,13 @@ builder.Services.AddDefaultIdentity<User>(options =>
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    //options.Cookie.HttpOnly = true;
-    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.Cookie.HttpOnly = true;
+    options.ExpireTimeSpan = TimeSpan.FromHours(12);
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     options.LoginPath = "/Account/Login"; // Chemin vers la page de connexion
     options.AccessDeniedPath = "/Account/AccessDenied"; // Chemin vers la page d'accès refusé
-    options.SlidingExpiration = false;
-
+    options.SlidingExpiration = true;
+    options.Cookie.IsEssential = true;
 });
 
 // Add services to the container.
@@ -50,7 +50,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 app.UseStaticFiles(new StaticFileOptions
 {
     ServeUnknownFileTypes = true

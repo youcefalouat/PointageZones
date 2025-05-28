@@ -44,33 +44,6 @@ public static class SeedData
             }
         }
 
-        // Ajouter les agents
-        var users = new[]
-        {
-            new { UserName = "Agent1", Password = "Agent123." },
-            new { UserName = "Agent2", Password = "Agent123." },
-            new { UserName = "Agent3", Password = "Agent123." }
-        };
-
-        foreach (var user in users)
-        {
-            var existingUser = await userManager.FindByNameAsync(user.UserName);
-            if (existingUser == null)
-            {
-                var newUser = new User
-                {
-                    UserName = user.UserName,
-                };
-
-                var userResult = await userManager.CreateAsync(newUser, user.Password);
-                if (!userResult.Succeeded)
-                {
-                    foreach (var error in userResult.Errors)
-                    {
-                        Console.WriteLine($"Erreur lors de la création de l'utilisateur {user.UserName}: {error.Description}");
-                    }
-                }
-            }
-        }
+        
     }
 }

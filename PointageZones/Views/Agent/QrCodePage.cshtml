@@ -24,12 +24,19 @@
         const readerDiv = document.getElementById("reader"); // Pour afficher les erreurs scanner
         const refZoneContainer = document.getElementById('refZone');
 
-        // Récupérer planTourId depuis l'URL (ex: /Agent/ScannerQRCode/501)
-        // Adaptez si votre URL est structurée différemment
-        const pathSegments = window.location.pathname.split('/');
-        const planTourId = parseInt(pathSegments[pathSegments.length - 1]);
+            // Get ID from either URL params or path
+        const planTourId = (() => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fromParams = parseInt(urlParams.get('id'));
 
-        if (isNaN(planTourId)) {
+            if (!isNaN(fromParams)) return fromParams;
+
+            const pathSegments = window.location.pathname.split('/');
+            const fromPath = parseInt(pathSegments[pathSegments.length - 1]);
+            return isNaN(fromPath) ? null : fromPath;
+        })();
+
+        if (planTourId === null) {
             console.error("IDs invalides (NaN)!", planTourId);
             readerDiv.innerHTML = '<p class="alert alert-danger">Erreur: Identifiants de pointage invalides.</p>';
             return;

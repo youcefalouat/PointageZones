@@ -84,17 +84,18 @@ namespace PointageZones.Controllers
         // GET: User/Create
         public IActionResult Create()
         {
+            // Récupérer tous les rôles disponibles
+            var roles = _roleManager.Roles.Select(r => r.Name).ToList();
+            ViewBag.Roles = roles;
+
             return View();
         }
 
         // POST: User/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Nom,Prenom,UserName,PasswordHash")] User user)
-        { 
-            
+        public async Task<IActionResult> Create([Bind("Nom,Prenom,UserName,PasswordHash")] User user, string? Role)
+        {
             var existingUser = await userManager.FindByNameAsync(user.UserName);
             if (existingUser == null)
             {
@@ -111,16 +112,49 @@ namespace PointageZones.Controllers
                     foreach (var error in userResult.Errors)
                     {
                         Console.WriteLine($"Erreur lors de la création de l'utilisateur {user.UserName}: {error.Description}");
-                        
+                        ModelState.AddModelError("", error.Description);
                     }
-                    TempData["Notification"] = "Erreur lors de la création de l'utilisateur" + user.UserName +": ";
-                    return View(user);
+
+                    // Récupérer tous les rôles disponibles
+                    var roles = _roleManager.Roles.Select(r => r.Name).ToList();
+                    ViewBag.Roles = roles;
+
+                    // Create ViewModel for returning to the view
+                    var userRolesViewModel = new UserRoleViewModel
+                    {
+                        User = user,
+                        Role = Role
+                    };
+
+                    TempData["Notification"] = "Erreur lors de la création de l'utilisateur " + user.UserName;
+                    return View(userRolesViewModel);
                 }
-                TempData["Notification"] = "Utilisateur Créé avec succés";
+
+                // Ajouter le rôle si spécifié
+                if (!string.IsNullOrEmpty(Role))
+                {
+                    await userManager.AddToRoleAsync(newUser, Role);
+                }
+
+                TempData["Notification"] = "Utilisateur Créé avec succès";
                 return RedirectToAction("Index");
             }
+
+            // Si l'utilisateur existe déjà
             ModelState.AddModelError("", "Ce User existe déjà !");
-            return View(user);
+
+            // Récupérer tous les rôles disponibles
+            var availableRoles = _roleManager.Roles.Select(r => r.Name).ToList();
+            ViewBag.Roles = availableRoles;
+
+            // Create ViewModel for returning to the view
+            var existingUserViewModel = new UserRoleViewModel
+            {
+                User = user,
+                Role = Role
+            };
+
+            return View(existingUserViewModel);
         }
 
         // GET: users/Edit/5
@@ -245,6 +279,7 @@ namespace PointageZones.Controllers
         //    return RedirectToAction("Index");
         //}
 
+        // POST: users/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(string id, [Bind("Id,Nom,Prenom,UserName,PasswordHash")] User user, string? NewPassword, string? Role)
@@ -287,7 +322,20 @@ namespace PointageZones.Controllers
                             {
                                 ModelState.AddModelError("", error.Description);
                             }
-                            return View(user);
+
+                            // Prepare ViewModel for returning to the view
+                            var userRolesViewModel = new UserRoleViewModel
+                            {
+                                User = user,
+                                Role = Role
+                            };
+
+                            // Récupérer tous les rôles disponibles
+                            var roles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
+                            ViewBag.Roles = roles;
+                            ViewBag.CurrentRole = Role;
+
+                            return View(userRolesViewModel);
                         }
                     }
 
@@ -298,7 +346,20 @@ namespace PointageZones.Controllers
                         {
                             ModelState.AddModelError("", error.Description);
                         }
-                        return View(user);
+
+                        // Prepare ViewModel for returning to the view
+                        var userRolesViewModel = new UserRoleViewModel
+                        {
+                            User = user,
+                            Role = Role
+                        };
+
+                        // Récupérer tous les rôles disponibles
+                        var roles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
+                        ViewBag.Roles = roles;
+                        ViewBag.CurrentRole = Role;
+
+                        return View(userRolesViewModel);
                     }
 
                     TempData["Notification"] = "Utilisateur modifié avec succès";
@@ -316,9 +377,22 @@ namespace PointageZones.Controllers
                     }
                 }
             }
-            return View(user);
-        }
 
+            // If we got this far, something failed, redisplay form
+            // Prepare ViewModel for returning to the view
+            var errorViewModel = new UserRoleViewModel
+            {
+                User = user,
+                Role = Role
+            };
+
+            // Récupérer tous les rôles disponibles
+            var availableRoles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
+            ViewBag.Roles = availableRoles;
+            ViewBag.CurrentRole = Role;
+
+            return View(errorViewModel);
+        }
 
         // GET: Users/Delete/5
         public async Task<IActionResult> Delete(string? id)
@@ -328,14 +402,24 @@ namespace PointageZones.Controllers
                 return NotFound();
             }
 
-            var Users = await _context.Users
+            var user = await _context.Users
                 .FirstOrDefaultAsync(m => m.Id == id);
-            if (Users == null)
+            if (user == null)
             {
                 return NotFound();
             }
 
-            return View(Users);
+            // Récupérer le rôle de l'utilisateur
+            var roles = await userManager.GetRolesAsync(user);
+            var roleName = roles.FirstOrDefault(); // Get the first (and only) role
+
+            var userRolesViewModel = new UserRoleViewModel
+            {
+                User = user,
+                Role = roleName // Store the single role name
+            };
+
+            return View(userRolesViewModel);
         }
 
         // POST: Users/Delete/5
@@ -359,7 +443,18 @@ namespace PointageZones.Controllers
                 {
                     ModelState.AddModelError("", error.Description);
                 }
-                return View(user); // Renvoie la vue actuelle pour afficher les erreurs.
+
+                // Récupérer le rôle de l'utilisateur
+                var roles = await userManager.GetRolesAsync(user);
+                var roleName = roles.FirstOrDefault(); // Get the first (and only) role
+
+                var userRolesViewModel = new UserRoleViewModel
+                {
+                    User = user,
+                    Role = roleName // Store the single role name
+                };
+
+                return View(userRolesViewModel);
             }
 
             TempData["Notification"] = "Utilisateur désactivé avec succès.";

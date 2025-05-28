@@ -132,10 +132,10 @@
                     console.log(`✅ Réponse reçue pour Tournée ${tourId}:`, data);
 
                     if (!data.success && !data.tourPointee) {
-                       // row.style.display = "none";
-                       tourActuelleElement.innerHTML = "❌";
-                       tourAssignéElement.innerHTML = "❌";
-                       nextTourElement.innerHTML = "Fin de Tournée";
+                       row.style.display = "none";
+                       // tourActuelleElement.innerHTML = "❌";
+                       // tourAssignéElement.innerHTML = "❌";
+                       // nextTourElement.innerHTML = "Fin de Tournée";
                         console.error(`🚨 Erreur: Tournée ${tourId} indisponible.`);
                         return;
                     }
@@ -155,6 +155,7 @@
 					if (data.tourAssigné) {
 						tourAssignéElement.innerHTML = "✅";
 					} else {
+                        row.style.display = "none";
 						tourAssignéElement.innerHTML = "❌";
 					}
                 })

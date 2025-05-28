@@ -1,107 +1,112 @@
 ﻿// wwwroot/service-worker.js
 
 // --- Configuration ---
-const STATIC_CACHE_NAME = 'pointage-static-v6'; // Incrémentez pour forcer la màj des assets statiques
-const DYNAMIC_CACHE_NAME = 'pointage-dynamic-v6'; // Incrémentez si logique de cache dynamique change
+const STATIC_CACHE_NAME = 'pointage-static-v8';
+const DYNAMIC_CACHE_NAME = 'pointage-dynamic-v9';
 
 // --- Assets à pré-cacher (App Shell) ---
-// !!! ADAPTEZ CETTE LISTE À VOTRE PROJET !!!
 const STATIC_ASSETS = [
-    '/Agent/ScannerQRCode', 
-    '/offline.html',          // Page de fallback hors ligne (ASSUREZ-VOUS DE L'AVOIR CRÉÉE DANS wwwroot)
-    // --- CSS ---
-    '/css/site.css',          // Votre CSS principal
-    '/lib/bootstrap/dist/css/bootstrap.min.css', // Exemple Bootstrap (vérifiez le chemin)
-    // Ajoutez d'autres CSS essentiels...
-    // --- JavaScript ---
-    // Mettez ici les chemins LOCAUX si vous les avez téléchargés, sinon le SW essaiera de cacher les URL CDN si elles sont dans STATIC_ASSETS
-    '/js/site.js',            // Votre JS principal
-    '/js/db.js',              // Votre définition IndexedDB
-    '/lib/dexie.js',          // !! Chemin local vers Dexie (adaptez si besoin: dexie.min.js?)
-    '~/lib/chart.js',           // !! Chemin local vers Chart.js (adaptez si besoin: chart.min.js?)
-    '/lib/html5-qrcode.min.js',// !! Chemin local vers la lib QR Code (adaptez si besoin)
-    '/lib/bootstrap/dist/js/bootstrap.bundle.min.js', // Exemple Bootstrap JS (vérifiez le chemin)
-    // Ajoutez d'autres JS essentiels...
-    // --- Images/Icônes ---
+    '/offline.html',
+    '/css/site.css',
+    '/lib/bootstrap/dist/css/bootstrap.min.css',
+    '/js/site.js',
+    '/js/db.js',
+    '/lib/dexie.js',
+    '/lib/html5-qrcode.min.js',
+    '/lib/bootstrap/dist/js/bootstrap.bundle.min.js',
     '/favicon.ico',
-    '/images/logo_mini_s_192x192.png', 
-    '/images/logo_mini_s.png', 
-    // --- Manifest ---
+    '/images/logo_mini_s_192x192.png',
+    '/images/logo_mini_s.png',
     '/manifest.json'
-    // --- Fonts ---
-    // Ajoutez les polices si locales...
 ];
 
 // --- Inclusion de Dexie.js pour la Synchro ---
-// !!! ADAPTEZ CE CHEMIN SI DEXIE EST LOCAL !!!
 try {
-    // Utilisez le chemin vers votre fichier Dexie local
-    importScripts('/lib/dexie.js'); // ou '/lib/dexie.min.js'
+    importScripts('/lib/dexie.js');
     console.log("[Service Worker] Dexie.js importé avec succès.");
 } catch (e) {
     console.error("[Service Worker] Échec de l'importation de Dexie.js. La synchro ne fonctionnera pas:", e);
 }
 
-// Redéfinir la DB et ses stores EXACTEMENT comme dans db.js pour l'utiliser dans le SW
+// Redéfinir la DB et ses stores EXACTEMENT comme dans db.js
 let dbSync;
 if (typeof Dexie !== 'undefined') {
-    dbSync = new Dexie('pointageAppDB'); // Doit correspondre au nom dans db.js
-    dbSync.version(6).stores({ // Doit correspondre à la version et aux stores dans db.js
+    dbSync = new Dexie('pointageAppDB');
+    dbSync.version(6).stores({
         toursData: '&tourId, refTour',
         pendingScans: '&pointageId, planTourId, timestamp, qrCodeText'
     }).upgrade(tx => {
         console.log("Database upgraded to version 6!");
-        // You can perform data migrations or other tasks here if needed.
     });
     console.log("[Service Worker] Schéma DB pour la synchro défini.");
 } else {
     console.error("[Service Worker] Dexie non défini, impossible de configurer la DB pour la synchro.");
 }
 
+// --- Fonction utilitaire pour vérifier si une réponse est la vraie page QR ---
+function isValidQRScannerPage(responseText) {
+    // Vérifie la présence d'éléments spécifiques à la page QR scanner
+    return responseText.includes('id="reader"') &&
+        responseText.includes('Html5Qrcode') &&
+        !responseText.includes('id="Input_UserName"') && // Pas la page de login
+        !responseText.includes('form-signin'); // Pas la page de login
+}
 
 // --- Installation du Service Worker ---
 self.addEventListener('install', event => {
     console.log('[Service Worker] Installation...');
     event.waitUntil(
-        caches.open(STATIC_CACHE_NAME)
-            .then(cache => {
+        (async () => {
+            try {
+                // Ouvrir le cache statique
+                const staticCache = await caches.open(STATIC_CACHE_NAME);
+
+                // Pré-cacher les assets statiques
                 console.log('[Service Worker] Pré-cache de l\'App Shell...');
-                // Filtrer les URLs potentiellement problématiques avant addAll
-                const urlsToCache = STATIC_ASSETS.filter(url => url && typeof url === 'string' && (url.startsWith('/') || url.startsWith('http')));
+                const urlsToCache = STATIC_ASSETS.filter(url =>
+                    url && typeof url === 'string' && (url.startsWith('/') || url.startsWith('http'))
+                );
                 console.log('[Service Worker] URLs à pré-cacher:', urlsToCache);
-                return cache.addAll(urlsToCache);
-            })
-            .then(() => {
-                console.log('[Service Worker] App Shell pré-cachée avec succès.');
-                return self.skipWaiting(); // Active le nouveau SW immédiatement
-            })
-            .catch(error => {
-                console.error('[Service Worker] Échec du pré-cache:', error);
-            })
+                await staticCache.addAll(urlsToCache);
+
+                // Ouvrir le cache dynamique pour la page QR
+                const dynamicCache = await caches.open(DYNAMIC_CACHE_NAME);
+
+                // Pré-cacher la page QR scanner de base (sans paramètres)
+                console.log('[Service Worker] Pré-cache de la page QR scanner...');
+                try {
+                    const qrResponse = await fetch('/Agent/ScannerQRCode', {
+                        credentials: 'include',
+                        headers: { 'Cache-Control': 'no-cache' }
+                    });
+
+                    if (qrResponse.ok) {
+                        const responseText = await qrResponse.text();
+                        if (isValidQRScannerPage(responseText)) {
+                            await dynamicCache.put('/Agent/ScannerQRCode', qrResponse.clone());
+                            console.log('[Service Worker] Page QR scanner pré-cachée avec succès');
+                        } else {
+                            console.log('[Service Worker] Page de login détectée lors du pré-cache, pas de mise en cache');
+                        }
+                    }
+                } catch (qrError) {
+                    console.warn('[Service Worker] Impossible de pré-cacher la page QR:', qrError);
+                }
+
+                console.log('[Service Worker] Installation terminée avec succès.');
+                return self.skipWaiting();
+
+            } catch (error) {
+                console.error('[Service Worker] Échec de l\'installation:', error);
+                throw error;
+            }
+        })()
     );
 });
 
 // --- Activation du Service Worker ---
-//self.addEventListener('activate', event => {
-//    console.log('[Service Worker] Activation...');
-//    event.waitUntil(
-//        caches.keys().then(keys => {
-//            return Promise.all(keys
-//                .filter(key => key !== STATIC_CACHE_NAME && key !== DYNAMIC_CACHE_NAME)
-//                .map(key => {
-//                    console.log(`[Service Worker] Suppression de l'ancien cache: ${key}`);
-//                    return caches.delete(key);
-//                })
-//            );
-//        }).then(() => {
-//            console.log('[Service Worker] Anciens caches supprimés.');
-//            return self.clients.claim();
-//        })
-//    );
-//});
-
 self.addEventListener('activate', event => {
-    const allowedCaches = [STATIC_CACHE_NAME, DYNAMIC_CACHE_NAME]; // Liste des caches autorisés
+    const allowedCaches = [STATIC_CACHE_NAME, DYNAMIC_CACHE_NAME];
     event.waitUntil(
         caches.keys().then(keys => {
             return Promise.all(
@@ -112,6 +117,8 @@ self.addEventListener('activate', event => {
                     }
                 })
             );
+        }).then(() => {
+            return self.clients.claim();
         })
     );
 });
@@ -123,7 +130,9 @@ self.addEventListener('fetch', event => {
     if (event.request.method !== 'GET') { return; }
     if (!url.protocol.startsWith('http')) { return; }
 
-    const isStaticAssetRequest = STATIC_ASSETS.some(assetUrl => url.href === new URL(assetUrl, self.location.origin).href) ||
+    const isStaticAssetRequest = STATIC_ASSETS.some(assetUrl =>
+        url.href === new URL(assetUrl, self.location.origin).href
+    ) ||
         STATIC_ASSETS.includes(url.pathname) ||
         url.pathname.startsWith('/lib/') ||
         url.pathname.startsWith('/css/') ||
@@ -136,85 +145,142 @@ self.addEventListener('fetch', event => {
         event.respondWith(
             caches.match(event.request).then(cachedResponse => {
                 if (cachedResponse) return cachedResponse;
-                return fetch(event.request).catch(err => console.error(`[SW Fetch] Erreur fetch asset statique ${url.pathname}:`, err));
+                return fetch(event.request).catch(err =>
+                    console.error(`[SW Fetch] Erreur fetch asset statique ${url.pathname}:`, err)
+                );
             })
         );
+        return;
     }
-    else if (event.request.mode === 'navigate') {
-        // Case 1: DebutTour (Network First)
-        if (url.pathname.startsWith('/Agent/DebutTour')) {
-            event.respondWith(
-                fetch(event.request)
-                    .then(fetchResponse => {
-                        const clonedResponse = fetchResponse.clone();
-                        if (fetchResponse.ok) {
-                            caches.open(DYNAMIC_CACHE_NAME)
-                                .then(cache => cache.put(event.request, clonedResponse));
-                        }
-                        return fetchResponse;
-                    })
-                    .catch(() => caches.match(event.request)
-                        .then(cachedResponse => cachedResponse || caches.match('/offline.html'))
-                    )
-            );
-        }
-        // Case 2: ScannerQRCode - Amélioration pour fonctionnement hors ligne
-        else if (url.pathname.startsWith('/Agent/ScannerQRCode')) {
-            event.respondWith(
-                // Essayer d'abord le cache pour tout chemin ScannerQRCode
-                caches.match(event.request)
-                    .then(cachedResponse => {
-                        // Si trouvé en cache, retourner immédiatement
-                        if (cachedResponse) {
-                            console.log(`[SW Fetch] Réponse trouvée en cache pour ${url.pathname}`);
-                            return cachedResponse;
-                        }
 
-                        // Sinon essayer le réseau et mettre en cache
-                        console.log(`[SW Fetch] Requête réseau pour ${url.pathname}`);
-                        return fetch(event.request)
-                            .then(networkResponse => {
-                                // Mettre en cache pour utilisation hors ligne future
-                                const clonedResponse = networkResponse.clone();
-                                if (networkResponse.ok) {
-                                    caches.open(DYNAMIC_CACHE_NAME)
-                                        .then(cache => {
-                                            console.log(`[SW Fetch] Mise en cache de ${url.pathname}`);
-                                            cache.put(event.request, clonedResponse);
-                                        });
-                                }
-                                return networkResponse;
-                            })
-                            .catch(error => {
-                                console.warn(`[SW Fetch] Échec réseau pour ${url.pathname}. Recherche alternatives...`);
-
-                                // Si c'est une URL avec paramètre et qu'on est hors ligne,
-                                // essayer de servir la page ScannerQRCode de base
-                                if (url.pathname !== '/Agent/ScannerQRCode') {
-                                    return caches.match('/Agent/ScannerQRCode')
-                                        .then(basePageResponse => {
-                                            if (basePageResponse) {
-                                                console.log(`[SW Fetch] Retourne la page ScannerQRCode de base`);
-                                                return basePageResponse;
-                                            }
-
-                                            // En dernier recours, page hors ligne
-                                            console.log(`[SW Fetch] Retourne la page offline.html`);
-                                            return caches.match('/offline.html');
-                                        });
-                                }
-
-                                // Fallback à la page hors ligne
-                                return caches.match('/offline.html');
-                            });
-                    })
-            );
-        }
-    }
-    // Stratégie 3: Network First, Cache Fallback pour les appels API
-    else if (url.pathname.startsWith('/api/')) {
+    // Stratégie spéciale pour la page ScannerQRCode
+    if (url.pathname.startsWith('/Agent/ScannerQRCode')) {
         event.respondWith(
-            // Essayer d'abord le cache pour les API
+            (async () => {
+                console.log(`[SW Fetch] Requête pour ${url.pathname}${url.search}`);
+
+                // D'abord vérifier le cache pour la page de base
+                const cachedResponse = await caches.match('/Agent/ScannerQRCode');
+
+                try {
+                    // Essayer le réseau avec les credentials
+                    console.log(`[SW Fetch] Tentative réseau pour ${url.pathname}${url.search}`);
+                    const networkResponse = await fetch(event.request, {
+                        credentials: 'include',
+                        headers: {
+                            'Cache-Control': 'no-cache'
+                        }
+                    });
+
+                    if (networkResponse.ok) {
+                        const responseText = await networkResponse.text();
+
+                        // Vérifier si c'est la vraie page QR scanner
+                        if (isValidQRScannerPage(responseText)) {
+                            console.log(`[SW Fetch] Page QR scanner valide reçue du réseau`);
+
+                            // Mettre à jour le cache avec la nouvelle version
+                            const cache = await caches.open(DYNAMIC_CACHE_NAME);
+                            const responseToCache = new Response(responseText, {
+                                status: networkResponse.status,
+                                statusText: networkResponse.statusText,
+                                headers: networkResponse.headers
+                            });
+                            await cache.put('/Agent/ScannerQRCode', responseToCache);
+                            console.log(`[SW Fetch] Cache de la page QR scanner mis à jour`);
+
+                            // Retourner la réponse réseau
+                            return new Response(responseText, {
+                                status: networkResponse.status,
+                                statusText: networkResponse.statusText,
+                                headers: networkResponse.headers
+                            });
+                        } else {
+                            console.log(`[SW Fetch] Page de login détectée du réseau`);
+
+                            // Si on a une page de login du réseau mais une page QR en cache, utiliser le cache
+                            if (cachedResponse) {
+                                const cachedText = await cachedResponse.text();
+                                if (isValidQRScannerPage(cachedText)) {
+                                    console.log(`[SW Fetch] Utilisation de la page QR scanner en cache à la place de la page de login`);
+                                    return new Response(cachedText, {
+                                        status: cachedResponse.status,
+                                        statusText: cachedResponse.statusText,
+                                        headers: cachedResponse.headers
+                                    });
+                                }
+                            }
+
+                            // Sinon retourner la page de login
+                            return networkResponse;
+                        }
+                    } else {
+                        console.warn(`[SW Fetch] Réponse réseau non-OK (${networkResponse.status})`);
+
+                        // En cas d'erreur serveur, essayer le cache
+                        if (cachedResponse) {
+                            const cachedText = await cachedResponse.text();
+                            if (isValidQRScannerPage(cachedText)) {
+                                console.log(`[SW Fetch] Utilisation de la page QR scanner en cache (erreur serveur)`);
+                                return new Response(cachedText, {
+                                    status: cachedResponse.status,
+                                    statusText: cachedResponse.statusText,
+                                    headers: cachedResponse.headers
+                                });
+                            }
+                        }
+
+                        return networkResponse;
+                    }
+                } catch (networkError) {
+                    console.warn(`[SW Fetch] Erreur réseau pour ${url.pathname}:`, networkError);
+
+                    // En cas d'erreur réseau, essayer le cache
+                    if (cachedResponse) {
+                        const cachedText = await cachedResponse.text();
+                        if (isValidQRScannerPage(cachedText)) {
+                            console.log(`[SW Fetch] Utilisation de la page QR scanner en cache (hors ligne)`);
+                            return new Response(cachedText, {
+                                status: cachedResponse.status,
+                                statusText: cachedResponse.statusText,
+                                headers: cachedResponse.headers
+                            });
+                        }
+                    }
+
+                    // Fallback vers la page offline
+                    console.log(`[SW Fetch] Aucune page QR valide en cache, redirection vers offline`);
+                    return caches.match('/offline.html') ||
+                        new Response('Page non disponible hors ligne', { status: 503 });
+                }
+            })()
+        );
+        return;
+    }
+
+    // Stratégie pour les pages de navigation (Network First)
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then(fetchResponse => {
+                    const clonedResponse = fetchResponse.clone();
+                    if (fetchResponse.ok) {
+                        caches.open(DYNAMIC_CACHE_NAME)
+                            .then(cache => cache.put(event.request, clonedResponse));
+                    }
+                    return fetchResponse;
+                })
+                .catch(() =>
+                    caches.match(event.request)
+                        .then(cachedResponse => cachedResponse || caches.match('/offline.html'))
+                )
+        );
+        return;
+    }
+
+    // Stratégie pour les appels API (Cache First avec mise à jour en arrière-plan)
+    if (url.pathname.startsWith('/api/')) {
+        event.respondWith(
             caches.match(event.request)
                 .then(cachedResponse => {
                     if (cachedResponse) {
@@ -256,8 +322,10 @@ self.addEventListener('fetch', event => {
                         });
                 })
         );
+        return;
     }
 });
+
 // --- Gestion des Notifications Push ---
 self.addEventListener('push', event => {
     console.log('[Service Worker] Push received');
@@ -266,6 +334,7 @@ self.addEventListener('push', event => {
         title: 'Pointage Zones',
         body: 'Notification',
         icon: '/images/icons/icon-192x192.png',
+        badge: '/images/icons/icon-192x192.png',
         data: { url: '/' }
     };
 
@@ -285,17 +354,9 @@ self.addEventListener('push', event => {
         body: notificationData.body,
         icon: notificationData.icon,
         badge: '/images/icons/icon-96x96.png',
-        vibrate: [100, 50, 100], 
+        vibrate: [100, 50, 100],
         data: notificationData.data,
         tag: 'pointage-notification',
-        /*
-        actions: [
-            {
-                action: 'open',
-                title: 'Ouvrir'
-            }
-        ],*/
-        // The notification will be automatically closed when clicked
         requireInteraction: true,
         renotify: true
     };
@@ -327,39 +388,48 @@ self.addEventListener('notificationclick', event => {
     );
 });
 
-
 // --- Gestion de la Synchronisation en Arrière-Plan ---
 self.addEventListener('sync', event => {
     if (event.tag === 'sync-pending-scans') {
         console.log('[Service Worker] Événement Sync reçu pour "sync-pending-scans"');
-        if (!dbSync) { console.error("[Service Worker] La base de données (dbSync) n'est pas disponible pour la synchro !"); return; }
+        if (!dbSync) {
+            console.error("[Service Worker] La base de données (dbSync) n'est pas disponible pour la synchro !");
+            return;
+        }
         event.waitUntil(syncPendingScans());
     }
 });
 
 // --- Fonction pour synchroniser les scans en attente ---
 async function syncPendingScans() {
-    if (!dbSync) { console.error("[syncPendingScans] dbSync n'est pas disponible."); return Promise.reject("dbSync not available"); }
+    if (!dbSync) {
+        console.error("[syncPendingScans] dbSync n'est pas disponible.");
+        return Promise.reject("dbSync not available");
+    }
     console.log("[syncPendingScans] Début de la tentative de synchronisation...");
     let firstError = null;
 
     try {
         const scansToSync = await dbSync.pendingScans.toArray();
-        if (!scansToSync.length) { console.log('[syncPendingScans] Aucun scan en attente.'); return Promise.resolve(); }
+        if (!scansToSync.length) {
+            console.log('[syncPendingScans] Aucun scan en attente.');
+            return Promise.resolve();
+        }
 
         console.log(`[syncPendingScans] ${scansToSync.length} scan(s) trouvé(s).`);
 
         for (const scan of scansToSync) {
             console.log(`[syncPendingScans] Tentative pour scan ID local: ${scan.pointageId}`, scan);
             try {
-                const response = await fetch('/Agent/ValiderQRCode', { // !! VÉRIFIEZ URL !!
-                    method: 'POST', headers: { 'Content-Type': 'application/json', },
+                const response = await fetch('/Agent/ValiderQRCode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({
-                        qrCodeText: scan.qrCodeText, 
+                        qrCodeText: scan.qrCodeText,
                         PlanTourId: scan.planTourId,
                         datetimescan: scan.timestamp,
                         PointageId: scan.pointageId
-
                     })
                 });
 
@@ -381,19 +451,18 @@ async function syncPendingScans() {
             } catch (networkError) {
                 console.error(`[syncPendingScans] Erreur réseau pour ID local ${scan.pointageId}.`, networkError);
                 if (!firstError) firstError = networkError;
-                // Ne pas supprimer, la synchro réessaiera. Arrêter éventuellement ici : throw networkError;
             }
-        } // Fin boucle for
+        }
 
         console.log('[syncPendingScans] Traitement de la file terminé.');
         if (firstError) {
             console.warn("[syncPendingScans] Au moins une erreur serveur/réseau rencontrée, la synchro réessaiera.");
-            throw firstError; // Rejeter pour que le SyncManager réessaie
+            throw firstError;
         }
         return Promise.resolve();
 
     } catch (dbError) {
         console.error('[syncPendingScans] Échec global de la synchronisation.', dbError);
-        throw dbError; // Rejeter pour que le SyncManager réessaie
+        throw dbError;
     }
 }

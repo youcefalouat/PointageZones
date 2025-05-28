@@ -7,17 +7,25 @@ namespace PointageZones.Controllers
     {
         public IActionResult Index()
         {
-            if (User.IsInRole("admin"))
+            try
             {
-                return RedirectToAction("Index", "Admin");
-            }
-            else if (User.IsInRole("user"))
-            {
-                return RedirectToAction("Index", "Agent");
-            }
+                if (User?.Identity?.IsAuthenticated == true)
+                {
+                    if (User.IsInRole("admin"))
+                    {
+                        return RedirectToAction("Index", "Admin");
+                    }
+                        
+                    return RedirectToAction("Index", "Agent");
+                }
 
-            // Default fallback
-            return RedirectToAction("Login", "Account");
+                return RedirectToAction("Login", "Account");
+            }
+            catch (Exception ex)
+            {
+                // Log or temporarily show error
+                return Content("Erreur dans HomeController.Index: " + ex.Message);
+            }
         }
     }
 }

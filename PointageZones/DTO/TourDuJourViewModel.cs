@@ -2,7 +2,7 @@
 {
     public class TourDuJourViewModel
     {
-        public int? TourId { get; set; }
+        public int TourId { get; set; }
         public string? TourRefTour { get; set; }
         public DateTime? Date { get; set; }
         public int NumeroTour { get; set; }

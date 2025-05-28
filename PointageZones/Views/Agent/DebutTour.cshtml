@@ -19,13 +19,14 @@
 <div class="container mt-4">
     <h2 class="text-center text-primary">Début de Pointage</h2>
     <hr />
+    <div id="offlineNotice" class="alert alert-warning mt-3" style="display:none;">
+        ⚠️ Vous êtes actuellement hors ligne. Certaines fonctionnalités peuvent être limitées.
+    </div>
 
     <div class="card p-4 shadow">
-        <h4 class="fw-bold">
-            ID de la tournée :
+        
             <input type="hidden" id="tour_Id" value="@tourId" />
-            <span id="tour_Id" value="@tourId" class="text-success">@tourId</span>
-        </h4>
+            
         <h4 class="fw-bold">
             Référence de la tournée :
             <input type="hidden" id="tourRef" value="@tourRef" />
@@ -56,10 +57,12 @@
         //     </form>
         // }*@
         <div class="mt-4">
+
             <h5 class="text-secondary">Zones à pointer :</h5>
             
             @* Le conteneur pour la liste dynamique *@
             <div id="zoneListContainer" class="mt-2">
+                <button class="btn btn-outline-primary btn-sm mt-2" onclick="manualReload()">🔄 Recharger les zones</button>
                 <p><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Chargement des zones...</p>
             </div>
         </div>
@@ -69,8 +72,7 @@
 
 
 
-@if (User.IsInRole("user"))
-{//script pour agent
+
     <script>
 
                 document.addEventListener('DOMContentLoaded', async () => {
@@ -214,6 +216,8 @@
 
             let displayedFromDB = false;
 
+                    
+       
             // --- Fonction pour Afficher la Liste ---
             function renderZoneList(zones, container, tourId) {
                 if (!container) return;
@@ -221,10 +225,14 @@
                     container.innerHTML = '<p class="text-info">Aucune zone à pointer pour cette tournée.</p>';
                     return;
                 }
-
+                
                 let listHtml = '<ul class="list-group list-group-flush">';
                 zones.forEach(zone => {
-                    const scanUrl = `/Agent/ScannerQRCode/${zone.planTourId}`;
+                    if (!zone.planTourId || !zone.refZone) {
+                        return; 
+                    }
+
+                const scanUrl = `/Agent/ScannerQRCode?id=${zone.planTourId}`;
                     listHtml += `<li class="list-group-item d-flex justify-content-between align-items-center ps-0 pe-0">
                         <div><i class="bi bi-geo-alt-fill text-secondary me-2"></i>
                         <span class="fw-bold">${zone.refZone || 'Zone inconnue'}</span></div>
@@ -232,11 +240,14 @@
                            data-plantour-id="${zone.planTourId}" data-zone-ref="${zone.refZone}">
                            <i class="bi bi-qr-code-scan"></i> Scanner</a>
                         </li>`;
+
                 });
                 listHtml += '</ul>';
                 container.innerHTML = listHtml;
             }
-
+            function manualReload() {
+                    loadAndDisplayData().catch(console.error);
+                }
             // --- Fonction Principale pour Charger/Afficher ---
             async function loadAndDisplayData() {
                 displayedFromDB = false;
@@ -304,15 +315,18 @@
                     }
                 }
             }
+                
 
             // --- Appel Initial ---
             await loadAndDisplayData();
              // Minimal auto-refresh:
-        setInterval(() => {
-            loadAndDisplayData().catch(console.error);
-            window.location.reload(true);
+            setInterval(() => {
+            if (navigator.onLine) {
+                 loadAndDisplayData().catch(console.error);
+            } else {
+                console.log("Pas de reload : hors ligne");
+            }
         }, 60000);
         });
 
     </script>
-}
