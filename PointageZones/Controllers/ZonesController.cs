@@ -187,23 +187,14 @@ namespace PointageZones.Controllers
                 {
                     Random random = new Random();
                     string newTag;
-
+                    string validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
                     do
                     {
                         // Generate a random string of 10 characters
                         char[] tagArray = new char[10];
-
                         for (int i = 0; i < 10; i++)
                         {
-                            char randomChar;
-                            do
-                            {
-                                // Generate a random character from the printable ASCII range (32-126)
-                                randomChar = (char)random.Next(32, 127);
-
-                                // Skip semicolons
-                            } while (randomChar == ';');
-
+                            char randomChar = validChars[random.Next(validChars.Length)];
                             tagArray[i] = randomChar;
                         }
 
@@ -230,53 +221,8 @@ namespace PointageZones.Controllers
                 }
                 
             }
+            return await ImprimeQRCodeAsync(id);
 
-
-            string zoneRef = zone.RefZone;
-            string zoneQR = zone.Id + ";" + zone.Tag;
-
-            if (string.IsNullOrEmpty(zoneRef))
-            {
-                return BadRequest("Invalid zone reference");
-            }
-
-            using (QRCodeGenerator qrGenerator = new QRCodeGenerator())
-            using (QRCodeData qrCodeData = qrGenerator.CreateQrCode(zoneQR, QRCodeGenerator.ECCLevel.Q))
-            using (QRCode qrCode = new QRCode(qrCodeData))
-            using (Bitmap qrCodeImage = qrCode.GetGraphic(20))
-            {
-                // Define text properties
-                Font font = new Font("Arial", 20, FontStyle.Bold);
-                int textPadding = 10;
-
-                // Calculate the new image size
-                int width = qrCodeImage.Width;
-                int height = qrCodeImage.Height + textPadding + 40; // Extra space for text
-
-                using (Bitmap finalImage = new Bitmap(width, height))
-                using (Graphics graphics = Graphics.FromImage(finalImage))
-                using (MemoryStream ms = new MemoryStream())
-                {
-                    graphics.Clear(Color.White);
-
-                    // Draw the QR code
-                    graphics.DrawImage(qrCodeImage, new Point(0, 0));
-
-                    // Draw the text below the QR code
-                    StringFormat stringFormat = new StringFormat
-                    {
-                        Alignment = StringAlignment.Center,
-                        LineAlignment = StringAlignment.Near
-                    };
-
-                    Rectangle textRect = new Rectangle(0, qrCodeImage.Height + textPadding, width, 40);
-                    graphics.DrawString(zoneRef, font, Brushes.Black, textRect, stringFormat);
-
-                    // Save and return the image
-                    finalImage.Save(ms, ImageFormat.Png);
-                    return File(ms.ToArray(), "image/png", $"{zoneRef}_QRCode.png");
-                }
-            }
         }
 
 

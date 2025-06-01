@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace PointageZones.Models
 {
     
-    public class Tour   
+    public class Tour : IValidatableObject
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -24,6 +24,22 @@ namespace PointageZones.Models
 
 
         public ICollection<PlanTour> PlanTours { get; set; } = new List<PlanTour>();
-        
+
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (FinTour != null && FrqTourMin == null)
+            {
+                yield return new ValidationResult(
+                    "La fréquence doit être renseignée si l'heure de fin est renseignée.",
+                    new[] { nameof(FrqTourMin) });
+            }
+            if (FrqTourMin != null && FinTour == null)
+            {
+                yield return new ValidationResult(
+                    "L'heure de fin doit être renseignée si la fréquence est renseignée.",
+                    new[] { nameof(FinTour) });
+            }
+        }
     }
 }

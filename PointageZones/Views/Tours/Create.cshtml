@@ -59,5 +59,39 @@
 </div>
 
 @section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+    <script>
+        (function () {
+            function validateTourFields(e) {
+                var finTour = document.querySelector('[name="FinTour"]').value;
+                var frqTourMin = document.querySelector('[name="FrqTourMin"]').value;
+                var errorMsg = "";
+
+                // Nettoyage des anciens messages
+                var finTourSpan = document.querySelector('[data-valmsg-for="FinTour"]');
+                var frqTourMinSpan = document.querySelector('[data-valmsg-for="FrqTourMin"]');
+                if (finTourSpan) finTourSpan.textContent = "";
+                if (frqTourMinSpan) frqTourMinSpan.textContent = "";
+
+                if (finTour && !frqTourMin) {
+                    errorMsg = "La fréquence est obligatoire si l'heure de fin est renseignée.";
+                    if (frqTourMinSpan) frqTourMinSpan.textContent = errorMsg;
+                    e.preventDefault();
+                }
+                if (frqTourMin && !finTour) {
+                    errorMsg = "L'heure de fin est obligatoire si la fréquence est renseignée.";
+                    if (finTourSpan) finTourSpan.textContent = errorMsg;
+                    e.preventDefault();
+                }
+            }
+
+            var form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', validateTourFields);
+            }
+        })();
+    </script>
 }
+

@@ -4,27 +4,28 @@
 
 <div class="container text-center my-4">
     <div class="row justify-content-center">
-        <div class="col-auto clock p-3 rounded ">
-            <div class="time-box mx-2 p-3 rounded">
-                <span id="hours" class="fs-1 fw-bold">00</span>
-                <span class="time-label d-block">Heures</span>
+        <div class="col-auto clock p-4 rounded ">
+            <div class="time-box mx-3 p-4 rounded">
+                <span id="hours" class="fw-bold" style="font-size: 3rem;">00</span>
+                <span class="time-label d-block" style="font-size: 0.8rem;">Heures</span>
             </div>
 
-            <div class="time-box mx-2 p-3 rounded">
-                <span id="minutes" class="fs-1 fw-bold">00</span>
-                <span class="time-label d-block">Minutes</span>
+            <div class="time-box mx-3 p-4 rounded">
+                <span id="minutes" class="fw-bold" style="font-size: 3rem;">00</span>
+                <span class="time-label d-block" style="font-size: 0.8rem;">Minutes</span>
             </div>
 
-            <div class="time-box mx-2 p-3 rounded">
-                <span id="seconds" class="fs-1 fw-bold">00</span>
-                <span class="time-label d-block">Secondes</span>
+            <div class="time-box mx-3 p-4 rounded">
+                <span id="seconds" class="fw-bold" style="font-size: 3rem;">00</span>
+                <span class="time-label d-block" style="font-size: 0.8rem;">Secondes</span>
             </div>
         </div>
     </div>
 </div>
 
 <br />
-
+@if (User.IsInRole("chef") || (User.IsInRole("admin")))
+{
 <div class="container mt-4">
     <h2 class="text-center mb-3">📋 Liste des Tournées</h2>
     <div class="table-responsive">
@@ -82,7 +83,13 @@
         </table>
     </div>
 </div>
-
+}
+else
+{
+	<div class="container mt-4">
+		<h1 class="text-center">Aucune tournée assigné pour le moment.</h1>
+	</div>
+}
 <script>
       document.addEventListener("DOMContentLoaded", function () {
         const hoursToShow = document.getElementById("hours");
@@ -97,13 +104,13 @@
             secondsToShow.textContent = String(now.getSeconds()).padStart(2, '0');
         }, 1000);
 
-        // ⏳ Mise à jour toutes les minutes et reload
+        // ⏳ Mise à jour toutes les 5 minutes et reload
         updateCountdowns();
         setInterval(() => {
             updateCountdowns();
             console.log("🔄 Reloading page...");
             window.location.reload(true);
-        }, 60 * 1000);
+        }, 300 * 1000);
     });
 
     function updateCountdowns() {
@@ -155,7 +162,7 @@
 					if (data.tourAssigné) {
 						tourAssignéElement.innerHTML = "✅";
 					} else {
-                        row.style.display = "none";
+                        //row.style.display = "none";
 						tourAssignéElement.innerHTML = "❌";
 					}
                 })

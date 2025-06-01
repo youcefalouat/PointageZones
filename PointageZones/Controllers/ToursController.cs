@@ -120,9 +120,10 @@ namespace PointageZones.Controllers
                         throw;
                     }
                 }
+                TempData["Notification"] = "Données de Tournée " + tour.RefTour + " Mis a jour";
                 return RedirectToAction(nameof(Index));
             }
-            TempData["Notification"] = "Données de Tournée Mis a jour";
+            
             return View(tour);
         }
 

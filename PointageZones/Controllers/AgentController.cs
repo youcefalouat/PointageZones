@@ -28,7 +28,6 @@ namespace PointageZones.Controllers
         private readonly PushNotificationService _notificationService;
         private readonly IConfiguration _configuration;
 
-
         public AgentController(ApplicationDbContext context, ILogger<AgentController> logger, PushNotificationService notificationService, IConfiguration configuration)
         {
             _context = context;
@@ -88,8 +87,9 @@ namespace PointageZones.Controllers
                                 _logger.LogError(ex, "Failed to send push notification (awaited) to user {UserId} for tour {TourId}", userId, tourId);
                                 // IMPORTANT: Decide if a notification failure should prevent the redirect.
                                 // If not, this catch block is sufficient. If it should, you might rethrow or handle differently.
-                            }
 
+                                TempData["Notification"] = "Notification non envoyé";
+                            }
 
                             return RedirectToAction("DebutTour","Agent" ,new { id = pointage.PlanTour.TourId });
                             }
@@ -807,18 +807,32 @@ namespace PointageZones.Controllers
                     .Select(p => p.PlanTour.ZoneId)
                     .Distinct()
                     .ToListAsync();
+                if (zonesPointées.Count() == 0)
+                {
+                    zoneAssigné = await _context.Pointages
+                        .Where(p => p.PlanTour.TourId == id &&
+                                    zonesTournee.Contains(p.PlanTour.ZoneId) &&
+                                    p.DateTimeDebTour >= lastTour.Value &&
+                                    p.DateTimeFinTour <= nextTour &&
+                                    (p.IsChecked == 0 || p.DateTimeAssign != null))
+                        .Select(p => p.PlanTour.ZoneId)
+                        .Distinct()
+                        .ToListAsync();
+                }
+                else
+                {
+                    zoneAssigné = await _context.Pointages
+                        .Where(p => p.PlanTour.TourId == id &&
+                                    zonesTournee.Contains(p.PlanTour.ZoneId) &&
+                                    p.DateTimeDebTour >= nextTour &&
+                                    p.DateTimeFinTour <= nextTour.Value.AddMinutes(tour.FrqTourMin.Value) &&
+                                    (p.IsChecked == 0 || p.DateTimeAssign != null))
+                        .Select(p => p.PlanTour.ZoneId)
+                        .Distinct()
+                        .ToListAsync();
+                }
 
-                zoneAssigné = await _context.Pointages
-                    .Where(p => p.PlanTour.TourId == id &&
-                                zonesTournee.Contains(p.PlanTour.ZoneId) &&
-                                p.DateTimeDebTour >= lastTour.Value &&
-                                p.DateTimeFinTour <= nextTour &&
-                                (p.IsChecked == 0 || p.DateTimeAssign != null))
-                    .Select(p => p.PlanTour.ZoneId)
-                    .Distinct()
-                    .ToListAsync();
-
-                tourPointee = zonesTournee.All(zoneId => zonesPointées.Contains(zoneId));
+                    tourPointee = zonesTournee.All(zoneId => zonesPointées.Contains(zoneId));
 
                 // 🔥 Gestion du passage après minuit
                 if (tour.FinTour.HasValue)
@@ -881,6 +895,7 @@ namespace PointageZones.Controllers
                 return Json(result);
             }
         }
+
         //private async Task<checkTourPointee> checkTourPointee(int? id)
         //{
         //    try
@@ -1273,7 +1288,6 @@ namespace PointageZones.Controllers
         [HttpPost]
         public async Task<IActionResult> ValiderQRCode([FromBody] ScanQRCodeDTO data)
         {
-            
             try
             {
 
