@@ -134,11 +134,11 @@ async function registerPushSubscription() {
     } catch (error) {
         console.error('Error registering push subscription:', error);
         if (error.name === 'InvalidStateError') {
-            alert('Could not subscribe for push notifications. The VAPID public key might be invalid or the push service is unavailable. Please try again later or contact support.');
+            //alert('Could not subscribe for push notifications. The VAPID public key might be invalid or the push service is unavailable. Please try again later or contact support.');
         } else if (error.message && error.message.includes("permission")) {
             // Handled by permission check, but good to log
         } else {
-            alert('An error occurred while setting up push notifications. Please try again.');
+            //alert('An error occurred while setting up push notifications. Please try again.');
         }
         return false;
     }
@@ -343,7 +343,7 @@ async function initializePushManager() {
 
     } catch (error) {
         console.error('Error during push manager initialization:', error);
-        alert('Could not initialize push notifications. Please try refreshing the page.');
+        //alert('Could not initialize push notifications. Please try refreshing the page.');
     }
 }
 

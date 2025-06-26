@@ -27,6 +27,7 @@ namespace PointageZones.Controllers
         private readonly ILogger<AgentController> _logger;
         private readonly PushNotificationService _notificationService;
         private readonly IConfiguration _configuration;
+        private readonly DateTime now;
 
         public AgentController(ApplicationDbContext context, ILogger<AgentController> logger, PushNotificationService notificationService, IConfiguration configuration)
         {
@@ -34,6 +35,7 @@ namespace PointageZones.Controllers
             _logger = logger;
             _notificationService = notificationService;
             _configuration = configuration;
+            now = DateTime.Now;//.Date.AddHours(00).AddMinutes(00);
         }
         
         [Authorize]
@@ -50,12 +52,14 @@ namespace PointageZones.Controllers
                     var pointagesIncomplets = await _context.Pointages
                            .Include(p => p.PlanTour)
                             .ThenInclude(pt => pt.Tour)
-                           .Where(p => p.UserId == userId && p.IsChecked == 0 && p.DateTimeAssign.HasValue && p.DateTimeAssign.Value.Date == DateTime.Now.Date)
+                           .Where(p => p.UserId == userId && p.IsChecked == 0 
+                           && ((p.DateTimeDebTour.HasValue && p.DateTimeDebTour.Value.Date == now.Date)
+                           || (p.DateTimeFinTour.HasValue && p.DateTimeFinTour.Value.Date == now.Date)))
                            .ToListAsync();
 
                     foreach (var pointage in pointagesIncomplets)
                     {                        
-                        if (pointage.DateTimeDebTour < DateTime.Now && pointage.DateTimeFinTour >= DateTime.Now)
+                        if (pointage.DateTimeDebTour < now && pointage.DateTimeFinTour >= now)
                             {
                             // Get the tour details needed for the notification
                             int tourId = pointage.PlanTour.TourId;
@@ -174,7 +178,7 @@ namespace PointageZones.Controllers
                     {
                         var checkResult = await checkTourPointee(id);
 
-                        if (tour.DebTour > TimeOnly.FromDateTime(DateTime.Now))
+                        if (tour.DebTour > TimeOnly.FromDateTime(now))
                         {
                             TempData["Notification"] = checkResult.message != null ? checkResult.message : "Erreur dans la tournée";
                             return RedirectToAction(nameof(Index));
@@ -195,7 +199,7 @@ namespace PointageZones.Controllers
                         var zonesPointees = checkResult.zonePointée;
                         if (zonesPointees != null && zonesPointees.Count != 0)
                         {
-                            // 🔍 Exclure les zones déjà pointées de la liste des `PlanTours`
+                             // 🔍 Exclure les zones déjà pointées de la liste des `PlanTours`
                             var planToursNonPointes = tour.PlanTours
                                                           .Where(pt => !zonesPointees.Contains(pt.ZoneId))
                                                           .ToList();
@@ -231,7 +235,8 @@ namespace PointageZones.Controllers
                         var pointages = await _context.Pointages
                             .Include(p => p.PlanTour)
                             .Where(p => p.UserId == userId && p.PlanTour.TourId == id && p.IsChecked == 0 &&
-                                   p.DateTimeAssign.HasValue && p.DateTimeAssign.Value.Date == DateTime.Now.Date)
+                                   ((p.DateTimeDebTour.HasValue && p.DateTimeDebTour.Value.Date == now.Date)
+                           || (p.DateTimeFinTour.HasValue && p.DateTimeFinTour.Value.Date == now.Date)))
                             .ToListAsync();
 
                         if (!pointages.Any())
@@ -242,8 +247,8 @@ namespace PointageZones.Controllers
 
                         // Vérifier la disponibilité de la tournée selon sa fréquence
                         var pointagesIncomplets = pointages
-                            .Where(p => p.DateTimeDebTour < DateTime.Now
-                                    && p.DateTimeFinTour >= DateTime.Now).ToList();
+                            .Where(p => p.DateTimeDebTour < now
+                                    && p.DateTimeFinTour >= now).ToList();
 
                         if (!pointagesIncomplets.Any())
                         {
@@ -312,25 +317,48 @@ namespace PointageZones.Controllers
 
             try
             {
-                
-                DateTime? lastTourTime = await TourActuelleAsync(tour.Id);
 
-                if (lastTourTime != null)
-                {
-                    if (DateTime.Now > lastTourTime.Value.AddMinutes(tour.FrqTourMin.HasValue ? tour.FrqTourMin.Value : 1440))
-                    {
-                        return NotFound(new { message = "Tournée dépassé." });
-                    }
-                }
+                //DateTime? lastTourTime = await TourActuelleAsync(tour.Id);
 
+                //if (lastTourTime != null)
+                //{
+                //    if (now > lastTourTime.Value.AddMinutes(tour.FrqTourMin.HasValue ? tour.FrqTourMin.Value : 1440))
+                //    {
+                //        return NotFound(new { message = "Tournée dépassé." });
+                //    }
+                //}
+
+                // Logique complète pour les utilisateurs standards (vérifier les assignations réelles)
+                //    var pointages = await _context.Pointages
+                //        .Where(p => p.PlanTour.TourId == id &&
+                //                   zonesTournee.Contains(p.PlanTour.ZoneId) &&
+                //                   ((p.DateTimeScan.HasValue &&
+                //                     p.DateTimeScan >= startTime &&
+                //                     p.DateTimeScan <= endTime) ||
+                //                    (p.DateTimeDebTour.HasValue &&
+                //                     p.DateTimeFinTour.HasValue &&
+                //                     p.DateTimeDebTour >= startTime &&
+                //                     p.DateTimeFinTour <= endTime)))
+                //        .Select(p => new {
+                //            ZoneId = p.PlanTour.ZoneId,
+                //            UserId = p.UserId,
+                //            IsScanned = p.DateTimeScan.HasValue && p.IsChecked == 1 &&
+                //                       p.DateTimeScan >= startTime && p.DateTimeScan <= endTime,
+                //            IsAssigned = (p.IsChecked == 0 || p.DateTimeAssign.HasValue) 
+                //                        && p.DateTimeDebTour >= startTime && p.DateTimeFinTour <= endTime
+                //        })
+                //        .ToListAsync();
 
                 var pendingPointages = await _context.Pointages
                     .Include(pa => pa.PlanTour)
                     .Where(pa => pa.PlanTour.TourId == tourId
                         && pa.UserId == userId
                         && pa.IsChecked == 0
-                        && pa.DateTimeDebTour == lastTourTime
-                        && pa.DateTimeFinTour == (lastTourTime.HasValue ? lastTourTime.Value.AddMinutes(tour.FrqTourMin ?? 1440) : (DateTime?)null))
+                        && pa.DateTimeDebTour < now
+                        && pa.DateTimeFinTour >= now
+                        //&& pa.DateTimeDebTour == lastTourTime
+                        //&& pa.DateTimeFinTour == (lastTourTime.HasValue ? lastTourTime.Value.AddMinutes(tour.FrqTourMin ?? 1440) : (DateTime?)null)
+                        )
                     .ToListAsync();
 
                 // 3. Gérer le cas où il n'y a rien à pointer
@@ -436,7 +464,7 @@ namespace PointageZones.Controllers
                             {
                                 item.Ref_User_Update = userObs.UserName;
                                 item.ObservationId = observation;
-                                item.Last_Update = DateTime.Now;
+                                item.Last_Update = now;
                                 _context.Update(item);
                             }
                                                         
@@ -529,7 +557,7 @@ namespace PointageZones.Controllers
                                 existingPointage.UserId = username;
                                 existingPointage.User = user;
                                 existingPointage.Ref_User_Assign = userAssign?.UserName;
-                                existingPointage.Last_Update = DateTime.Now;
+                                existingPointage.Last_Update = now;
 
                                 _context.Pointages.Update(existingPointage);
                             }
@@ -543,11 +571,11 @@ namespace PointageZones.Controllers
                                     PlanTour = item,
                                     IsChecked = 0,
                                     DateTimeScan = null,
-                                    DateTimeAssign = DateTime.Now,
+                                    DateTimeAssign = now,
                                     DateTimeDebTour = debTour,
                                     DateTimeFinTour = finTour,
                                     Ref_User_Assign = userAssign?.UserName,
-                                    Last_Update = DateTime.Now,
+                                    Last_Update = now,
                                 };
 
                                 _context.Pointages.Add(pointage);
@@ -590,7 +618,7 @@ namespace PointageZones.Controllers
                 // If no id is provided, just show the selection form
                 if (!id.HasValue)
                 {
-                    ViewBag.SelectedDate = date ?? DateTime.Now.Date;
+                    ViewBag.SelectedDate = date ?? (now.Hour < 9 ? now.Date.AddDays(-1) : now.Date);
                     return View(new List<TourDuJourViewModel>());
                 }
 
@@ -602,7 +630,7 @@ namespace PointageZones.Controllers
                 }
 
                 // Get today's date (or use DateTime.Today)
-                var today = date ?? DateTime.Now.Date;
+                var today = date ?? (now.Hour < 9 ? now.Date.AddDays(-1) : now.Date);
 
                 ViewBag.SelectedDate = today;
 
@@ -628,8 +656,9 @@ namespace PointageZones.Controllers
                 {
                     // Calculate start and end times for this slot
                     var startTime = today.AddHours(tour.DebTour.Hour)
-                                        .AddMinutes((double)(tour.FrqTourMin.HasValue ? tour.DebTour.Minute + i * tour.FrqTourMin : tour.DebTour.Minute));
+                                        .AddMinutes(tour.DebTour.Minute + i * (tour.FrqTourMin ?? 0));
                     var endTime = (tour.FinTour == null || tour.FrqTourMin == null) ? startTime.AddMinutes(1440) : startTime.AddMinutes(tour.FrqTourMin.Value);
+
 
                     // Get the zones that should be visited during this tour
                     var zonesTournee = await _context.PlanTours
@@ -645,14 +674,17 @@ namespace PointageZones.Controllers
                         .OrderBy(p => p.DateTimeDebTour)
                         .ToListAsync();
 
-                    var zonesPointees = pointages.Where(p => p.IsChecked == 1).Select(p => p.PlanTour.ZoneId).Distinct().ToList();
+                    var zonesPointees = pointages.Where(p => p.IsChecked == 1 && p.DateTimeScan.HasValue && p.DateTimeScan >= startTime && p.DateTimeScan <= endTime).Select(p => p.PlanTour.ZoneId).Distinct().ToList();
                     // Check if all required zones were scanned during this time slot
                     bool tourComplete = zonesTournee.Count > 0 &&
                                        zonesTournee.All(z => zonesPointees.Contains(z));
 
+
                     // First and last pointage time, if any
-                    DateTime? firstPointage = pointages.Any() ? pointages.First().DateTimeScan : null;
-                    DateTime? lastPointage = pointages.Any() ? pointages.Last().DateTimeScan : null;
+                    var validPointages = pointages.Where(p => p.DateTimeScan.HasValue && p.DateTimeScan >= startTime && p.DateTimeScan <= endTime).ToList();
+
+                    DateTime? firstPointage = validPointages.Count > 0 ? validPointages.First().DateTimeScan : null;
+                    DateTime? lastPointage = validPointages.Count > 0 ? validPointages.Last().DateTimeScan : null;
 
                     // Create the view model for this slot 
                     tourSlots.Add(new TourDuJourViewModel
@@ -668,7 +700,7 @@ namespace PointageZones.Controllers
                         tourFait = tourComplete,
                         ZonesRequises = zonesTournee.Count,
                         ZonesPointees = zonesPointees.Count,
-                        TourAssigné = pointages.Any() && pointages.All(p => p.IsChecked == 0),
+                        TourAssigné = pointages.Any() && pointages.All(p => p.IsChecked == 0 && p.DateTimeAssign.HasValue),
                         userId = pointages.FirstOrDefault()?.User.UserName,
                         observation = pointages.FirstOrDefault()?.Observation?.Description
                     });
@@ -761,7 +793,7 @@ namespace PointageZones.Controllers
                                     zonesTournee.Contains(p.PlanTour.ZoneId) &&
                                     p.DateTimeScan != null &&
                                     p.DateTimeScan >= lastTour.Value &&
-                                    p.DateTimeScan.Value.Day == DateTime.Now.Day &&
+                                    //p.DateTimeScan.Value.Day == lastTour.Value.Day &&
                                     p.IsChecked == 1)
                         .Select(p => p.PlanTour.ZoneId)
                         .Distinct()
@@ -771,8 +803,8 @@ namespace PointageZones.Controllers
                         .Where(p => p.PlanTour.TourId == id &&
                                     zonesTournee.Contains(p.PlanTour.ZoneId) &&
                                     p.DateTimeDebTour >= lastTour.Value &&
-                                    p.DateTimeDebTour.Value.Day == DateTime.Now.Day &&
-                                    p.IsChecked == 0)
+                                    p.DateTimeDebTour.Value.Day == lastTour.Value.Day &&
+                                    (p.IsChecked == 0 || p.DateTimeAssign != null))
                         .Select(p => p.PlanTour.ZoneId)
                         .Distinct()
                         .ToListAsync();
@@ -837,7 +869,7 @@ namespace PointageZones.Controllers
                 // 🔥 Gestion du passage après minuit
                 if (tour.FinTour.HasValue)
                 {
-                    DateTime finTourTime = DateTime.Now.Date.AddHours(tour.FinTour.Value.Hour).AddMinutes(tour.FinTour.Value.Minute);
+                    DateTime finTourTime = now.Date.AddHours(tour.FinTour.Value.Hour).AddMinutes(tour.FinTour.Value.Minute);
                     if (tour.FinTour.Value.Hour < tour.DebTour.Hour)
                     {
                         finTourTime = finTourTime.AddDays(1); // Passage au lendemain
@@ -859,7 +891,7 @@ namespace PointageZones.Controllers
                 }
 
                 // ⏳ Calcul du temps restant avant la prochaine tournée
-                TimeSpan diff = nextTour.Value - DateTime.Now;
+                TimeSpan diff = nextTour.Value - now;
 
 
                 int diffHours = (int)diff.TotalHours;
@@ -959,7 +991,7 @@ namespace PointageZones.Controllers
 
         //private async Task<checkTourPointee> HandleSingleTourAsync(int? id, List<int> zonesTournee, DateTime lastTour, Tour tour, bool isAdminOrChef)
         //{
-        //    var today = DateTime.Now.Date;
+        //    var today = now.Date;
         //    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         //    // Récupération optimisée des pointages pour tournée unique
@@ -1102,7 +1134,7 @@ namespace PointageZones.Controllers
         //{
         //    if (!tour.FinTour.HasValue) return false;
 
-        //    var today = DateTime.Now.Date;
+        //    var today = now.Date;
         //    var finTourTime = today.Add(tour.FinTour.Value.ToTimeSpan());
 
         //    // Gestion du passage après minuit
@@ -1116,7 +1148,7 @@ namespace PointageZones.Controllers
 
         //private static string CalculateCountdown(DateTime nextTour)
         //{
-        //    var diff = nextTour - DateTime.Now;
+        //    var diff = nextTour - now;
         //    var hours = Math.Max(0, (int)diff.TotalHours);
         //    var minutes = Math.Max(0, diff.Minutes);
 
@@ -1139,79 +1171,79 @@ namespace PointageZones.Controllers
         //    return Json(result);
         //}
 
-        public async Task<DateTime?> TourAssignéAsync(int? id)
-        {
-            try
-            {
-                // 🔍 Vérifier si la tournée existe
-                var tour = await _context.Tours.FirstOrDefaultAsync(m => m.Id == id);
-                if (tour == null)
-                {
-                    return null;
-                }
+        //public async Task<DateTime?> TourAssignéAsync(int? id)
+        //{
+        //    try
+        //    {
+        //        // 🔍 Vérifier si la tournée existe
+        //        var tour = await _context.Tours.FirstOrDefaultAsync(m => m.Id == id);
+        //        if (tour == null)
+        //        {
+        //            return null;
+        //        }
 
-                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-                if (string.IsNullOrEmpty(userId))
-                {
-                    return null;
-                }
-                DateTime defaultTime = DateTime.MinValue;
+        //        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        //        if (string.IsNullOrEmpty(userId))
+        //        {
+        //            return null;
+        //        }
+        //        DateTime defaultTime = DateTime.MinValue;
 
-                var PointagesAssigné = await _context.Pointages
-                    .Include(pa => pa.PlanTour)
-                    .Where(pa => pa.PlanTour.TourId == id && pa.UserId == userId
-                        && pa.IsChecked == 0
-                        && DateTime.Now >= pa.DateTimeDebTour
-                        && DateTime.Now <= pa.DateTimeFinTour)
-                    .FirstOrDefaultAsync();
+        //        var PointagesAssigné = await _context.Pointages
+        //            .Include(pa => pa.PlanTour)
+        //            .Where(pa => pa.PlanTour.TourId == id && pa.UserId == userId
+        //                && pa.IsChecked == 0
+        //                && now >= pa.DateTimeDebTour
+        //                && now <= pa.DateTimeFinTour)
+        //            .FirstOrDefaultAsync();
 
-                DateTime now = PointagesAssigné != null && PointagesAssigné.DateTimeScan.HasValue
-                    ? PointagesAssigné.DateTimeScan.Value
-                    : DateTime.Now;
+        //        DateTime now = PointagesAssigné != null && PointagesAssigné.DateTimeScan.HasValue
+        //            ? PointagesAssigné.DateTimeScan.Value
+        //            : now;
 
-                DateTime startTour = now.Date.AddHours(tour.DebTour.Hour).AddMinutes(tour.DebTour.Minute);
+        //        DateTime startTour = now.Date.AddHours(tour.DebTour.Hour).AddMinutes(tour.DebTour.Minute);
 
-                if (now < startTour)
-                {
-                    return defaultTime;
-                }
-                DateTime lastTour = startTour;
+        //        if (now < startTour)
+        //        {
+        //            return defaultTime;
+        //        }
+        //        DateTime lastTour = startTour;
 
-                if (!tour.FinTour.HasValue)
-                {
-                    return lastTour;
-                }
+        //        if (!tour.FinTour.HasValue)
+        //        {
+        //            return lastTour;
+        //        }
 
-                DateTime endTour = now.Date.AddHours(tour.FinTour.Value.Hour).AddMinutes(tour.FinTour.Value.Minute);
+        //        DateTime endTour = now.Date.AddHours(tour.FinTour.Value.Hour).AddMinutes(tour.FinTour.Value.Minute);
 
-                if (tour.FinTour.Value.Hour < tour.DebTour.Hour)
-                {
-                    endTour = endTour.AddDays(1);
-                }
+        //        if (tour.FinTour.Value.Hour < tour.DebTour.Hour)
+        //        {
+        //            endTour = endTour.AddDays(1);
+        //        }
 
-                if (tour.FrqTourMin.HasValue)
-                {
-                    int frequency = tour.FrqTourMin.Value;
+        //        if (tour.FrqTourMin.HasValue)
+        //        {
+        //            int frequency = tour.FrqTourMin.Value;
 
-                    while (lastTour.AddMinutes(frequency) <= now && lastTour.AddMinutes(frequency) <= endTour)
-                    {
-                        lastTour = lastTour.AddMinutes(frequency);
-                    }
-                }
+        //            while (lastTour.AddMinutes(frequency) <= now && lastTour.AddMinutes(frequency) <= endTour)
+        //            {
+        //                lastTour = lastTour.AddMinutes(frequency);
+        //            }
+        //        }
 
-                if (lastTour > endTour)
-                {
-                    return defaultTime;
-                }
+        //        if (lastTour > endTour)
+        //        {
+        //            return defaultTime;
+        //        }
 
-                return lastTour;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erreur lors du calcul de la tournée actuelle pour ID {Id}", id);
-                return null;
-            }
-        }
+        //        return lastTour;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError(ex, "Erreur lors du calcul de la tournée actuelle pour ID {Id}", id);
+        //        return null;
+        //    }
+        //}
 
 
 
@@ -1226,13 +1258,22 @@ namespace PointageZones.Controllers
                     return null;
                 }
                 DateTime defaultTime = DateTime.MinValue;
-                DateTime now = DateTime.Now;
-                DateTime startTour = now.Date.AddHours(tour.DebTour.Hour).AddMinutes(tour.DebTour.Minute);
+                DateTime startTour = defaultTime;
+                DateTime endTour = defaultTime;
+                if (now.Hour < 9)
+                {
+                    startTour = now.Date.AddDays(-1).AddHours(tour.DebTour.Hour).AddMinutes(tour.DebTour.Minute);
+                }
+                else
+                {
+                    startTour = now.Date.AddHours(tour.DebTour.Hour).AddMinutes(tour.DebTour.Minute);
+                }
                 /*
                 if (now < startTour)
                 {
                     return defaultTime;
                 }*/
+
                 DateTime lastTour = startTour;
 
                 if (!tour.FinTour.HasValue)
@@ -1240,7 +1281,16 @@ namespace PointageZones.Controllers
                     return lastTour;
                 }
 
-                DateTime endTour = now.Date.AddHours(tour.FinTour.Value.Hour).AddMinutes(tour.FinTour.Value.Minute);
+                
+
+                if (now.Hour < 9)
+                {
+                    endTour = now.Date.AddDays(-1).AddHours(tour.FinTour.Value.Hour).AddMinutes(tour.FinTour.Value.Minute);
+                }
+                else
+                {
+                    endTour = now.Date.AddHours(tour.FinTour.Value.Hour).AddMinutes(tour.FinTour.Value.Minute);
+                }
 
                 if (tour.FinTour.Value.Hour < tour.DebTour.Hour)
                 {
@@ -1354,7 +1404,7 @@ namespace PointageZones.Controllers
                                 PlanTourId = planTour.Id,
                                 PlanTour = planTour,
                                 IsChecked = 1,
-                                DateTimeScan = data.datetimescan.HasValue ? data.datetimescan.Value.AddHours(1) : DateTime.Now,
+                                DateTimeScan = data.datetimescan.HasValue ? data.datetimescan.Value.AddHours(1) : now,
                                 DateTimeAssign = null,
                                 IsValid = (qrCodeTag != null && qrCodeTag == planTour.Zone.Tag) ? 1 : 0
                             };
@@ -1395,9 +1445,9 @@ namespace PointageZones.Controllers
                         {
                             pointagesIncomplets.IsChecked = 1;
                             pointagesIncomplets.IsValid = (qrCodeTag != null && qrCodeTag == planTour.Zone.Tag) ? 1 : 0;
-                            pointagesIncomplets.DateTimeScan = data.datetimescan.HasValue ? data.datetimescan.Value.AddHours(1) : DateTime.Now;
+                            pointagesIncomplets.DateTimeScan = data.datetimescan.HasValue ? data.datetimescan.Value.AddHours(1) : now;
                             pointagesIncomplets.ObservationId = null;
-                            pointagesIncomplets.Last_Update = DateTime.Now;
+                            pointagesIncomplets.Last_Update = now;
 
                             _context.Update(pointagesIncomplets);
                             await _context.SaveChangesAsync();

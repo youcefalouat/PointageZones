@@ -48,14 +48,18 @@
                 <td>@Html.DisplayFor(modelItem => item.FinTour)</td>
                 <td>@Html.DisplayFor(modelItem => item.FrqTourMin)</td>
                 <td>
-                    <b>@string.Join(" | ", item.PlanTours.Select(pt => pt.Zone.RefZone))</b>
+                    @* <b>@string.Join(" | ", item.PlanTours.Select(pt => pt.Zone.RefZone))</b> *@
+                    @foreach (var pt in item.PlanTours)
+                    {
+                        <div><b> @pt.Zone.RefZone</b></div>
+                    }
                 </td>
                 <td>
                     <div class="d-flex flex-column flex-md-row gap-2">
+                        <a asp-controller="PlanTours" asp-action="Edit" asp-route-id="@item.Id" class="btn btn-success btn-sm text-uppercase">Affécter zones</a>
                         <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-primary btn-sm text-uppercase">Détails</a>
-                        <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-warning btn-sm text-uppercase">Modifier</a>
-                        <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-danger btn-sm text-uppercase">Supprimer</a>
-                        <a asp-controller="PlanTours" asp-action="Edit" asp-route-id="@item.Id" class="btn btn-success btn-sm text-uppercase">Modifier les zones</a>
+                        @*<a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-warning btn-sm text-uppercase">Modifier</a>
+                        *@<a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-danger btn-sm text-uppercase">Supprimer</a>
                     </div>
                 </td>
         </tr>

@@ -71,7 +71,7 @@ namespace PointageZones.Controllers
                 TempData["Notification"] = "Tournée Créé avec succés";
                 return RedirectToAction(nameof(Index));
             }
-            return View("Index");
+            return View(tour);
         }
 
         // GET: Tours/Edit/5

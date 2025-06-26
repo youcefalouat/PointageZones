@@ -1,0 +1,42 @@
+﻿@model IEnumerable<PointageZones.Models.Observation>
+
+@{
+    ViewData["Title"] = "Index";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<br />
+
+<p>
+    <a asp-action="Create" class="btn btn-success">Créer Une Nouvelle Observation</a>
+</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.First().Description)
+            </th>
+            
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Description)
+                </td>
+                
+                <td>
+                    <div class="d-flex flex-column flex-md-row gap-2">
+                        <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-warning text-uppercase">Modifier</a>
+                        <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-danger text-uppercase">Supprimer</a>
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+

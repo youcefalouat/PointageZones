@@ -4,7 +4,7 @@
 
 <div class="container text-center my-4">
     <div class="row justify-content-center">
-        <div class="col-auto clock p-4 rounded ">
+        <div class="col-auto clock p-2 rounded ">
             <div class="time-box mx-3 p-4 rounded">
                 <span id="hours" class="fw-bold" style="font-size: 3rem;">00</span>
                 <span class="time-label d-block" style="font-size: 0.8rem;">Heures</span>
@@ -58,7 +58,7 @@
                             if (User.IsInRole("chef") || (User.IsInRole("admin")))
                             {
                             <a asp-action="TourDuJour" asp-controller="Agent"
-                               asp-route-id="@tour.Id" asp-route-date="@DateTime.Now.ToString("yyyy-MM-dd")">
+                               asp-route-id="@tour.Id" @* asp-route-date="@DateTime.Now.ToString("yyyy-MM-dd")" *@>
                                     @tour.RefTour
                             </a>
                             }else{

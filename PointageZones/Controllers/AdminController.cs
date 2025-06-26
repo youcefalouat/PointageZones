@@ -37,8 +37,8 @@ public class AdminController : Controller
 
     public async Task<IActionResult> Index(DateTime? startDate, DateTime? endDate, string selectedUser, string selectedTour)
     {
-        DateTime start = startDate ?? DateTime.UtcNow.AddDays(-1);
-        DateTime end = endDate ?? DateTime.UtcNow;
+        DateTime start = startDate ?? DateTime.Now.AddDays(-1);
+        DateTime end = endDate ?? DateTime.Now;
 
         var pointagesQuery = _context.Pointages
             .Include(p => p.User)
@@ -46,6 +46,7 @@ public class AdminController : Controller
                 .ThenInclude(pt => pt.Zone) 
             .Include(p => p.PlanTour)
                 .ThenInclude(pt => pt.Tour) 
+            .Include(p => p.Observation)
             .Where(p => p.DateTimeDebTour >= start && p.DateTimeDebTour <= end);
 
         if (!string.IsNullOrEmpty(selectedUser))
@@ -91,7 +92,7 @@ public class AdminController : Controller
         .Select(g => new UtilisateurPointageDto{UtilisateurId = g.Key,Nombre = g.Count()})
         .ToList();*/
 
-        var yesterday = DateTime.Today.AddDays(-1);
+        //var yesterday = DateTime.Today.AddDays(-1);
         var tours = _context.Tours
                     .Where(t => t.PlanTours.Count > 0 )
                     .ToList();
@@ -109,31 +110,48 @@ public class AdminController : Controller
                     var startTime = date.AddHours(tour.DebTour.Hour).AddMinutes(tour.DebTour.Minute + i * (tour.FrqTourMin ?? 0));
                     var endTime = (tour.FinTour == null || tour.FrqTourMin == null) ? startTime.AddMinutes(1440) : startTime.AddMinutes(tour.FrqTourMin.Value);
 
+                    // Check if this slot's start time exceeds our end boundary
+                    if (startTime > end)
+                    {
+
+                        break; // Exit the inner loop for this day
+                    }
+
+                    // Optional: Also check if the slot's end time exceeds our boundary
+                    // and adjust accordingly
+                    //if (endTime > end)
+                    //{
+                    //    endTime = end; // Cap the end time to our boundary
+                    //}
+
                     // Get the zones that should be visited during this tour
                     var zonesTournee = await _context.PlanTours
                         .Where(pt => pt.TourId == tour.Id)
                         .Select(pt => pt.ZoneId)
                         .ToListAsync();
 
-                    var point = await _context.Pointages
-                        .Where(p => p.PlanTour.TourId == tour.Id && p.DateTimeScan >= startTime && p.DateTimeScan < endTime && p.IsChecked == 1)
+                    var point = pointages
+                        .Where(p => p.PlanTour.TourId == tour.Id &&
+                                    p.DateTimeDebTour >= startTime && p.DateTimeFinTour <= endTime)
                         .OrderBy(p => p.DateTimeScan)
-                        .ToListAsync();
+                        .ToList();
 
                     var zonesPointees = point
-                        .Where(p => p.IsChecked == 1 && p.PlanTour != null)
+                        .Where(p => p.IsChecked == 1 && p.PlanTour != null && p.DateTimeScan.HasValue && p.DateTimeScan >= startTime && p.DateTimeScan <= endTime)
                         .Select(p => p.PlanTour.ZoneId)
                         .Distinct()
                         .ToList();
-
 
                     // Check if all required zones were scanned during this time slot
                     bool tourComplete = zonesTournee.Count > 0 &&
                                        zonesTournee.All(z => zonesPointees.Contains(z));
 
+                    var validPointages = point.Where(p => p.DateTimeScan.HasValue && p.DateTimeScan >= startTime && p.DateTimeScan <= endTime).ToList();
+                                                          
+
                     // First and last pointage time, if any
-                    DateTime? firstPointage = point.Any() ? point.First().DateTimeScan : null;
-                    DateTime? lastPointage = point.Any() ? point.Last().DateTimeScan : null;
+                    DateTime? firstPointage = validPointages.Count > 0 ? validPointages.First().DateTimeScan : null;
+                    DateTime? lastPointage = validPointages.Count > 0 && validPointages.Count == zonesTournee.Count ? validPointages.Last().DateTimeScan : null;
 
                     // Create the view model for this slot
                     tourDuJourViewModels.Add(new TourDuJourViewModel
@@ -149,7 +167,10 @@ public class AdminController : Controller
                         tourFait = tourComplete,
                         ZonesRequises = zonesTournee.Count,
                         ZonesPointees = zonesPointees.Count,
-                        TourAssigné = pointages.Any() && pointages.All(p => p.IsChecked == 0)
+                        TourAssigné = point.Any() && point.All(p => (p.IsChecked == 0 && p.DateTimeAssign.HasValue ) || (p.DateTimeScan.HasValue && p.DateTimeScan >= startTime && p.DateTimeScan <= endTime)),
+                        userId = point.FirstOrDefault()?.User.UserName,
+                        observation = point.FirstOrDefault()?.Observation?.Description
+
                     });
                 }
             }
