@@ -69,6 +69,7 @@
                 // On cherche le tour qui contient notre planTourId dans sa liste de zones
                 let tourId = null;
                 let zoneInfo = null;
+                let isFirstZone = false;
 
                 for (const tour of toursData) {
                     // Vérifie si le tour a des zones et parcourt ces zones
@@ -77,6 +78,7 @@
                         if (foundZone) {
                             tourId = tour.tourId;
                             zoneInfo = foundZone;
+                            isFirstZone = (tour.zones[0]?.planTourId === planTourId);
                             break;
                         }
                     }
@@ -85,6 +87,14 @@
                 if (!zoneInfo || !zoneInfo.zoneId || !tourId) {
                     throw new Error(`Informations pour planTourId ${planTourId} non trouvées dans les données locales de la tournée.`);
                 }
+
+                 // 5. Bloquer l'accès si ce n'est pas la première zone
+                    if (!isFirstZone) {
+                        alert("Vous devez scanner les zones dans l'ordre.");
+                        window.location.href = `/Agent/DebutTour/${tourId}`;
+                        return;
+                    }
+
                 console.log(`Veuillez placer la caméra sur le code Qr de la zone`);
                 console.log(`Veuillez ${zoneInfo.refZone}`);
                  // Display the zone reference here

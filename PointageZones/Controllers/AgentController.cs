@@ -17,6 +17,7 @@ using Microsoft.Data.SqlClient;
 using System.ComponentModel;
 using NuGet.Protocol.Core.Types;
 using PointageZones.Services;
+using Microsoft.AspNetCore.Identity;
 
 namespace PointageZones.Controllers
 {
@@ -28,14 +29,16 @@ namespace PointageZones.Controllers
         private readonly PushNotificationService _notificationService;
         private readonly IConfiguration _configuration;
         private readonly DateTime now;
+        private readonly UserManager<User> _userManager;
 
-        public AgentController(ApplicationDbContext context, ILogger<AgentController> logger, PushNotificationService notificationService, IConfiguration configuration)
+        public AgentController(ApplicationDbContext context, ILogger<AgentController> logger, PushNotificationService notificationService, IConfiguration configuration, UserManager<User> userManager)
         {
             _context = context;
             _logger = logger;
             _notificationService = notificationService;
             _configuration = configuration;
-            now = DateTime.Now;//.Date.AddHours(00).AddMinutes(00);
+            _userManager = userManager;
+            now = DateTime.Now;//.Date.AddDays(-1).AddHours(21).AddMinutes(9);
         }
         
         [Authorize]
@@ -606,20 +609,30 @@ namespace PointageZones.Controllers
                 return RedirectToAction(nameof(Index));
             }
         }
-        [Authorize(Roles = "chef,admin")]
+        [Authorize]
         public async Task<ActionResult> TourDuJour(int? id, DateTime? date)
         {
             try
             {
+                // Get current user
+                var currentUser = await _userManager.GetUserAsync(User);
+                var isAdminOrChef = User.IsInRole("admin") || User.IsInRole("chef");
+
                 // Get list of all tours for the dropdown
                 var allTours = await _context.Tours.OrderBy(t => t.RefTour).ToListAsync();
                 ViewBag.Tours = allTours;
 
-                // If no id is provided, just show the selection form
+                // If no id is provided, default to tour id = 1
                 if (!id.HasValue)
                 {
-                    ViewBag.SelectedDate = date ?? (now.Hour < 9 ? now.Date.AddDays(-1) : now.Date);
-                    return View(new List<TourDuJourViewModel>());
+                    id = 1; // Default to tour with id = 1
+                            // Check if the default tour exists
+                    var defaultTourExists = await _context.Tours.AnyAsync(t => t.Id == id);
+                    if (!defaultTourExists)
+                    {
+                        ViewBag.SelectedDate = date ?? (now.Hour < 9 ? now.Date.AddDays(-1) : now.Date);
+                        return View(new List<TourDuJourViewModel>());
+                    }
                 }
 
                 var tour = await _context.Tours.FirstOrDefaultAsync(pt => pt.Id == id);
@@ -720,6 +733,7 @@ namespace PointageZones.Controllers
                 ViewBag.Tour = tour;
                 ViewBag.Users = users;
                 ViewBag.Observation = observation;
+                ViewBag.IsAdminOrChef = isAdminOrChef;
 
                 // 3. Return the view with the time slots
                 return View(tourSlots);
@@ -869,14 +883,8 @@ namespace PointageZones.Controllers
                 // 🔥 Gestion du passage après minuit
                 if (tour.FinTour.HasValue)
                 {
-                    DateTime finTourTime = now.Date.AddHours(tour.FinTour.Value.Hour).AddMinutes(tour.FinTour.Value.Minute);
-                    if (tour.FinTour.Value.Hour < tour.DebTour.Hour)
-                    {
-                        finTourTime = finTourTime.AddDays(1); // Passage au lendemain
-                    }
-
                     // 🚫 Si la prochaine tournée dépasse l'heure de fin, arrêter
-                    if (nextTour > finTourTime)
+                    if (nextTour.Value.TimeOfDay >= tour.FinTour.Value.ToTimeSpan())
                     {
                         return new checkTourPointee
                         {
@@ -886,6 +894,7 @@ namespace PointageZones.Controllers
                             tourPointee = tourPointee,
                             currentTourTime = tour.DebTour.ToString("HH:mm"),
                             nextTourTime = "Tournée Faite",
+                            tourAssigné = true 
                         };
                     }
                 }
@@ -1321,10 +1330,49 @@ namespace PointageZones.Controllers
             }
         }
 
+        private bool IsFirstZoneInTour(int planTourId)
+        {
+            try
+            {
+                // Récupérer le plan de tournée
+                var planTour = _context.PlanTours
+                    .Include(pt => pt.Tour)
+                    .FirstOrDefault(pt => pt.Id == planTourId);
+
+                if (planTour == null) return false;
+
+                // Récupérer toutes les zones non scannées de cette tournée dans l'ordre
+
+                var unscannedZones = _context.Pointages
+                    .Include(pt => pt.PlanTour)
+                    .Where(p => p.PlanTour.TourId == planTour.TourId 
+                    && p.IsChecked == 0
+                    && (p.DateTimeDebTour < now && p.DateTimeFinTour >= now)
+                    )
+                    .OrderBy(p => p.PlanTour.Ordre) 
+                    .ToList();
+
+                // Vérifier si c'est la première zone non scannée
+                return unscannedZones.FirstOrDefault()?.PlanTourId == planTourId;
+            }
+            catch (Exception ex)
+            {
+                // Log l'erreur
+                return false;
+            }
+        }
+
         [HttpGet]
         [Route("Agent/ScannerQRCode")]
         public IActionResult ScannerQRCode(int? id)
         {
+            // Vérifier si c'est la première zone de la liste (optionnel côté serveur)
+            if (id.HasValue && !IsFirstZoneInTour(id.Value))
+            {
+                TempData["Notification"] = "Vous devez scanner les zones dans l'ordre";
+                return RedirectToAction("DebutTour");
+            }
+
             // Supprimer les en-têtes anti-cache par défaut
             Response.Headers.Remove("Cache-Control");
             Response.Headers.Remove("Pragma");
@@ -1355,6 +1403,16 @@ namespace PointageZones.Controllers
                 if (string.IsNullOrEmpty(data.qrCodeText))
                 {
                     return Json(new { message = "QR Code invalide.", redirectUrl = Url.Action("DebutTour", new { id = planTour.TourId }) });
+                }
+                bool isfirst = IsFirstZoneInTour(planTour.Id);
+                // Vérifier si c'est la première zone de la tournée
+                if (!isfirst)
+                {
+                    return Json(new
+                    {
+                        message = "Vous devez scanner les zones dans l'ordre.",
+                        redirectUrl = Url.Action("DebutTour", new { id = planTour.TourId })
+                    });
                 }
 
                 string? qrCodeTag = null;

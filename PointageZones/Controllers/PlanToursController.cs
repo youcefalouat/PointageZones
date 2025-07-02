@@ -177,45 +177,45 @@ namespace PointageZones.Controllers
             return View(tour);
         }
 
-        // POST: PlanTours/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+
         //[HttpPost]
         //[ValidateAntiForgeryToken]
-        //public async Task<IActionResult> Edit(int id, [Bind("Id,TourId,ZoneId")] PlanTour planTour)
+        //public async Task<IActionResult> Edit(int id, int[] ZoneIds)
         //{
-        //    if (id != planTour.Id)
+        //    var tour = await _context.Tours
+        //        .Include(t => t.PlanTours)
+        //        .FirstOrDefaultAsync(t => t.Id == id);
+
+        //    if (tour == null)
         //    {
         //        return NotFound();
         //    }
 
-        //    if (ModelState.IsValid)
+        //    // Supprimer les anciennes affectations
+        //    _context.PlanTours.RemoveRange(tour.PlanTours);
+
+        //    // Ajouter les nouvelles affectations
+        //    foreach (var zoneId in ZoneIds)
         //    {
-        //        try
+        //        // Charger les objets Tour et Zone avant l'enregistrement
+        //        var _Tour = await _context.Tours.FindAsync(id);
+        //        var _Zone = await _context.Zones.FindAsync(zoneId);
+
+        //        // Vérifier que les objets ne sont pas null avant de les utiliser
+        //        if (_Tour != null && _Zone != null)
         //        {
-        //            _context.Update(planTour);
-        //            await _context.SaveChangesAsync();
+        //            _context.PlanTours.Add(new PlanTour { TourId = id, Tour = _Tour, ZoneId = zoneId, Zone = _Zone });
         //        }
-        //        catch (DbUpdateConcurrencyException)
-        //        {
-        //            if (!PlanTourExists(planTour.Id))
-        //            {
-        //                return NotFound();
-        //            }
-        //            else
-        //            {
-        //                throw;
-        //            }
-        //        }
-        //        return RedirectToAction(nameof(Index));
         //    }
-        //    ViewData["TourId"] = new SelectList(_context.Tours, "Id", "RefTour", planTour.TourId);
-        //    ViewData["ZoneId"] = new SelectList(_context.Zones, "Id", "RefZone", planTour.ZoneId);
-        //    return View(planTour);
+
+        //    await _context.SaveChangesAsync();
+        //    return RedirectToAction("Index", "Tours");
         //}
+
+
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, int[] ZoneIds)
+        public async Task<IActionResult> Edit(int id, int[] ZoneIds, int[] ZoneOrders)
         {
             var tour = await _context.Tours
                 .Include(t => t.PlanTours)
@@ -229,24 +229,35 @@ namespace PointageZones.Controllers
             // Supprimer les anciennes affectations
             _context.PlanTours.RemoveRange(tour.PlanTours);
 
-            // Ajouter les nouvelles affectations
-            foreach (var zoneId in ZoneIds)
+            // Ajouter les nouvelles affectations avec l'ordre
+            if (ZoneIds != null && ZoneIds.Length > 0)
             {
-                // Charger les objets Tour et Zone avant l'enregistrement
-                var _Tour = await _context.Tours.FindAsync(id);
-                var _Zone = await _context.Zones.FindAsync(zoneId);
-
-                // Vérifier que les objets ne sont pas null avant de les utiliser
-                if (_Tour != null && _Zone != null)
+                for (int i = 0; i < ZoneIds.Length; i++)
                 {
-                    _context.PlanTours.Add(new PlanTour { TourId = id, Tour = _Tour, ZoneId = zoneId, Zone = _Zone });
+                    var zoneId = ZoneIds[i];
+                    var ordre = (ZoneOrders != null && i < ZoneOrders.Length) ? ZoneOrders[i] : i + 1;
+
+                    // Charger les objets Tour et Zone
+                    var _Tour = await _context.Tours.FindAsync(id);
+                    var _Zone = await _context.Zones.FindAsync(zoneId);
+
+                    if (_Tour != null && _Zone != null)
+                    {
+                        _context.PlanTours.Add(new PlanTour
+                        {
+                            TourId = id,
+                            Tour = _Tour,
+                            ZoneId = zoneId,
+                            Zone = _Zone,
+                            Ordre = ordre
+                        });
+                    }
                 }
             }
 
             await _context.SaveChangesAsync();
             return RedirectToAction("Index", "Tours");
         }
-
 
         // GET: PlanTours/Delete/5
         public async Task<IActionResult> Delete(int? id)

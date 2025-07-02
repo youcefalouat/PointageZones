@@ -111,7 +111,7 @@ public class AdminController : Controller
                     var endTime = (tour.FinTour == null || tour.FrqTourMin == null) ? startTime.AddMinutes(1440) : startTime.AddMinutes(tour.FrqTourMin.Value);
 
                     // Check if this slot's start time exceeds our end boundary
-                    if (startTime > end)
+                    if (startTime > end ||startTime < start)
                     {
 
                         break; // Exit the inner loop for this day

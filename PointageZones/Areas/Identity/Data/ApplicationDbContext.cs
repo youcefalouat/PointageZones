@@ -56,8 +56,19 @@ public class ApplicationDbContext : IdentityDbContext<User>
                       .HasForeignKey(e => e.ObservationId)
                       .IsRequired(false) // Optional relationship
                       .OnDelete(DeleteBehavior.SetNull); // Set null if observation is deleted
-                
-            
+
+            builder.Entity<PlanTour>(entity =>
+            {
+                // Index unique sur TourId + Ordre pour éviter les doublons d'ordre dans une même tournée
+                entity.HasIndex(e => new { e.TourId, e.Ordre })
+                      .IsUnique()
+                      .HasDatabaseName("IX_PlanTour_TourId_Ordre");
+
+                // Index unique sur TourId + ZoneId pour éviter qu'une zone soit ajoutée plusieurs fois à une tournée
+                entity.HasIndex(e => new { e.TourId, e.ZoneId })
+                      .IsUnique()
+                      .HasDatabaseName("IX_PlanTour_TourId_ZoneId");
+            });
 
     }
 }

@@ -6,284 +6,275 @@
     var currentDate = ViewBag.SelectedDate as DateTime? ?? DateTime.Now;
     var tourInfo = ViewBag.Tour as PointageZones.Models.Tour;
     var toursList = ViewBag.Tours as List<PointageZones.Models.Tour>;
+    var isAdminOrChef = ViewBag.IsAdminOrChef as bool? ?? false;
+    var users = ViewBag.Users as IEnumerable<string> ?? Enumerable.Empty<string>();
+    var observations = ViewBag.Observation as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
 }
 
-<div class="container mt-8">
-    @if (User.IsInRole("admin"))
+<div class="container mt-5">
+    @if (isAdminOrChef)
     {
-    <!-- Tour selection dropdown -->
-        <div class="mb-xxl-5">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Sélection de la Tournée</h4>
-                </div>
-                <div class="card-body">
-                        <form method="get" asp-action="TourDuJour" asp-controller="Agent" asp-route-id="" class="mb-2">
-                        @if (currentDate != null)
-                        {
-                            <input type="hidden" name="date" value="@currentDate.ToString("yyyy-MM-dd")" />
-                        }
+        <!-- Sélection de la tournée -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">Sélection de la Tournée</div>
+            <div class="card-body">
+                <form method="get" asp-action="TourDuJour" asp-controller="Agent">
+                    <input type="hidden" name="date" value="@currentDate:yyyy-MM-dd" />
+                    <div class="row g-2">
+                        <div class="col-md-8">
+                            <select name="id" class="form-select" onchange="this.form.submit()">
+                                @if (tourInfo == null)
+                                {
+                                    <option value="" disabled selected>-- Sélectionner une tournée --</option>
+                                }
+                                else
+                                {
+                                    <option value="" disabled>-- Sélectionner une tournée --</option>
+                                }
 
-                        <div class="row g-2">
-                            <div class="col-md-8">
-                                <select name="id" class="form-select" onchange="this.form.submit()">
-                                    @if (tourInfo == null)
+                                @if (toursList != null)
+                                {
+                                    @foreach (var tour in toursList)
                                     {
-                                        <option value="" disabled selected>-- Sélectionner une tournée --</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="" disabled>-- Sélectionner une tournée --</option>
-                                    }
-
-                                    @if (toursList != null)
-                                    {
-                                        @foreach (var tour in toursList)
+                                        @if (tourInfo != null && tourInfo.Id == tour.Id)
                                         {
-                                            @if (tourInfo != null && tourInfo.Id == tour.Id)
-                                            {
-                                                <option value="@tour.Id" selected>
-                                                    @tour.RefTour - @tour.Type
-                                                </option>
-                                            }
-                                            else
-                                            {
-                                                <option value="@tour.Id">
-                                                    @tour.RefTour - @tour.Type                                                    
-                                                </option>
-                                            }
-                                        }
-                                    }
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <button type="submit" class="btn btn-primary w-100">Sélectionner</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>}
-
-    <!-- Date selection form -->
-    @if (tourInfo != null)
-    {
-        <form method="get" asp-action="TourDuJour" asp-controller="Agent" class="mb-4">
-            <input type="hidden" name="id" value="@tourInfo.Id" />
-
-            <div class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label for="dateFilter" class="form-label">Date :</label>
-                    <input type="date" id="dateFilter" class="form-control" name="date"
-                           value="@currentDate.ToString("yyyy-MM-dd")" />
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">Filtrer</button>
-                </div>
-            </div>
-        </form>
-    }
-    else
-    {
-        <div class="alert alert-danger">Sélectionnez une tournée pour afficher ses détails.</div>
-    }
-    @* --- Affichage des détails de la tournée --- *@
-    @if (tourInfo != null)
-    {
-        <div class="mb-3">
-             @* Adaptez le lien retour si nécessaire *@
-             <a asp-controller="Agent" asp-action="Index" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Retour à la liste
-            </a>
-        </div>
-    <div class="card">
-        <div class="card-header bg-primary text-white">
-            <h2 class="text-center mb-0">
-                📋 Détail des tournées: @ViewBag.Tour.RefTour
-                <small class="d-block mt-1 fs-6">@ViewBag.Tour.Type @(string.IsNullOrEmpty(ViewBag.Tour.Observation) ? "" : $"- {ViewBag.Tour.Observation}")</small>
-            </h2>
-        </div>
-        <div class="card-body">
-            <div class="mb-3">
-                <a asp-controller="Agent" asp-action="Index" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left"></i> Retour
-                </a>
-            </div>
-
-            @if (!Model.Any())
-            {
-                <div class="alert alert-warning">
-                    <h5 class="alert-heading">Aucune donnée disponible</h5>
-                    <p>Impossible de calculer les créneaux pour cette tournée. Vérifiez que les heures de début, fin et la fréquence sont correctement configurées.</p>
-                </div>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-striped table-bordered">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Tournée</th>
-                                <th>N° Tour</th>
-                                <th>Début prévu</th>
-                                <th>Fin prévue</th>
-                                <th>Début réel</th>
-                                <th>Fin réelle</th>
-                                <th>Statut</th>
-                                <th>Zones requises</th>
-                                <th>Zones pointées</th>
-                                <th>Username</th>
-                                <th>Observation</th>
-                                <th colspan="2">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var tour in Model.OrderBy(t => t.Date).ThenBy(t => t.TourRefTour).ThenBy(t => t.NumeroTour))
-                            {
-                                var rowClass = "table-secondary"; // Défaut
-                                    if (tour.tourFait) { rowClass = "table-success"; }
-                                    else if (tour.TourAssigné && !tour.debPointage.HasValue) { rowClass = "table-info"; } // Assigné mais pas commencé?
-                                    else if (tour.debPointage.HasValue) { rowClass = "table-warning"; } // Commencé mais incomplet
-                                    else if (tour.finTour < DateTime.Now) { rowClass = "table-danger"; } // Non fait et dépassé
-
-                                //<tr class="@(tour.tourFait ? "table-success" : (tour.TourAssigné ? "table-alert" : "table-danger"))">
-                                <tr class="@rowClass">
-                                    <td>@tour.TourRefTour</td>
-                                    <td>@tour.NumeroTour</td>
-                                    <td>@tour.debTour.ToString("HH:mm")</td>
-                                    <td>@tour.finTour.ToString("HH:mm")</td>
-                                    <td>@(tour.debPointage?.ToString("HH:mm") ?? "-")</td>
-                                    <td>@(tour.finPointage?.ToString("HH:mm") ?? "-")</td>
-                                    <td>
-                                        @if (tour.tourFait)
-                                        {
-                                            <span class="badge bg-success">Complète</span>
-                                        }
-                                        else if (tour.ZonesPointees > 0)
-                                        {
-                                            <span class="badge bg-warning">Incomplète</span>
-                                        }
-                                        else if (tour.TourAssigné == true)
-                                        {
-                                             <span class="badge bg-info">Assigné</span>
-                                        }
-                                        else if(tour.finTour < DateTime.Now)
-                                        {
-                                            <span class="badge bg-danger">Non effectuée</span>
-                                        }else
-                                        {
-                                            <span class="badge bg-secondary">Non Assigné</span>
-                                        }
-                                    </td>
-                                    <td>@tour.ZonesRequises</td>
-                                    <td>@tour.ZonesPointees</td>
-                                    <td>@tour.userId</td>
-                                    <td>@tour.observation</td>
-                                    <td>
-                                        @if (!tour.tourFait && (tour.finTour > DateTime.Now))
-                                        {
-                                            @if (ViewBag.Users != null && ((IEnumerable<string>)ViewBag.Users).Any())
-                                            {
-                                                <form asp-action="AssignTour" method="post">
-
-                                                    <input type="hidden" name="debTour" value="@tour.debTour" />
-                                                    <input type="hidden" name="finTour" value="@tour.finTour" />
-                                                    <input type="hidden" name="tourId" value="@tour.TourId" />
-
-                                                    <div class="mb-1">
-                                                         <select name="username" class="form-select form-select-sm" required title="Sélectionner un agent pour la tournée N°@tour.NumeroTour">
-                                                            <option value="" selected disabled>-- Choisir Agent --</option>
-
-                                                            @foreach (var user in (IEnumerable<string>)ViewBag.Users)
-                                                            {
-                                                                <option value="@user">@user</option> @* The value sent will be the username string *@
-                                                            }
-                                                        </select>
-                                                    </div>
-                                                    <button type="submit" class="btn btn-sm btn-success w-100" title="Assigner la tournée N°@tour.NumeroTour à l'agent sélectionné">
-                                                        <i class="bi bi-person-check me-1"></i>Assigner
-                                                    </button>
-                                                        
-
-                                                </form>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted fst-italic">Aucun agent disponible.</span>
-                                            }
-
+                                            <option value="@tour.Id" selected>
+                                                @tour.RefTour - @tour.Type
+                                            </option>
                                         }
                                         else
                                         {
-                                            <span class="badge bg-secondary">Tournée dépassé</span>
+                                            <option value="@tour.Id">
+                                                @tour.RefTour - @tour.Type
+                                            </option>
                                         }
-                                    </td>
-                                    <td>
-                                        @if(@tour.TourAssigné == true)
-                                        {
-                                            <form asp-action="AssignObs" method="post">
-                                                    <input type="hidden" name="debTour" value="@tour.debTour" />
-                                                    <input type="hidden" name="finTour" value="@tour.finTour" />
-                                                    <input type="hidden" name="tourId" value="@tour.TourId" />
-                                                <div class="mb-1">
-                                                    <select name="observation" class="form-select form-select-sm" required title="Sélectionner une observation pour la tournée N°@tour.NumeroTour">
-                                                        <option value="" selected disabled>-- Choisir une observation --</option>
-
-                                                        @foreach (var obs in ViewBag.Observation)
-                                                        {
-                                                            <option value="@obs.Id">@obs.Description</option>
-                                                        }
-                                                    </select>
-                                                </div>
-                                                <button type="submit" class="btn btn-sm btn-success w-100" title="Modifer l'observation à la tournée N°@tour.NumeroTour">
-                                                    <i class="bi bi-person-check me-1"></i>Modifier
-                                                </button>
-                                            </form>
-                                        }
-                                    </td>
-										
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="card mt-4">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0">Statistiques</h5>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">Sélectionner</button>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="card text-white bg-success mb-3">
-                                    <div class="card-body text-center">
-                                        <h5 class="card-title">Complétés</h5>
-                                        <p class="card-text display-4">@Model.Count(t => t.tourFait)</p>
-                                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Filtre par date -->
+        @if (tourInfo != null)
+        {
+            <form method="get" asp-action="TourDuJour" asp-controller="Agent" class="mb-4">
+                <input type="hidden" name="id" value="@tourInfo.Id" />
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <label for="dateFilter" class="form-label">Date :</label>
+                        <input type="date" id="dateFilter" class="form-control" name="date" value="@currentDate:yyyy-MM-dd" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label d-block">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary w-100">Filtrer</button>
+                    </div>
+                </div>
+            </form>
+        }
+    }
+
+    @if (tourInfo != null)
+    {
+        <!-- Détail des tournées -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">📋 Tournée : @tourInfo.RefTour - @tourInfo.Type</h5>
+                @if (!string.IsNullOrEmpty(tourInfo.Observation))
+                {
+                    <small class="fst-italic">Observation : @tourInfo.Observation</small>
+                }
+                @if (!isAdminOrChef)
+                {
+                    <small class="d-block fst-italic">Mes tournées uniquement</small>
+                }
+            </div>
+            <div class="card-body">
+                <a asp-controller="Agent" asp-action="Index" class="btn btn-outline-secondary mb-3">
+                    <i class="bi bi-arrow-left"></i> Retour
+                </a>
+
+                @if (!Model.Any())
+                {
+                    <div class="alert alert-warning">
+                        <strong>Aucune donnée disponible.</strong>
+                        <p>
+                            @(isAdminOrChef
+                                ? "Vérifiez les horaires ou la configuration de la tournée."
+                                : "Aucune tournée assignée ce jour.")
+                        </p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Tournée</th>
+                                    <th>N°</th>
+                                    <th>Début</th>
+                                    <th>Fin</th>
+                                    @if (isAdminOrChef)
+                                    {
+                                        <th>Début réel</th>
+                                        <th>Fin réelle</th>
+                                        <th>Statut</th>
+                                        <th>Zones req.</th>
+                                        <th>Zones pointées</th>
+                                    }
+                                    <th>Agent</th>
+                                    @if (isAdminOrChef)
+                                    {
+                                        <th>Observation</th>
+                                        <th colspan="2">Action</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var tour in Model.OrderBy(t => t.Date).ThenBy(t => t.TourRefTour).ThenBy(t => t.NumeroTour))
+                                {
+                                    var rowClass = isAdminOrChef
+                                        ? tour.tourFait ? "table-success"
+                                        : tour.TourAssigné && !tour.debPointage.HasValue ? "table-info"
+                                        : tour.debPointage.HasValue ? "table-warning"
+                                        : tour.finTour < DateTime.Now ? "table-danger"
+                                        : "table-secondary"
+                                        : "";
+
+                                    <tr class="@rowClass">
+                                        <td>@tour.TourRefTour</td>
+                                        <td>@tour.NumeroTour</td>
+                                        <td>@tour.debTour.ToString("HH:mm")</td>
+                                        <td>@tour.finTour.ToString("HH:mm")</td>
+
+                                        @if (isAdminOrChef)
+                                        {
+                                            <td>@(tour.debPointage?.ToString("HH:mm") ?? "-")</td>
+                                            <td>@(tour.finPointage?.ToString("HH:mm") ?? "-")</td>
+                                            <td>
+                                                @if (tour.tourFait)
+                                                {
+                                                    <span class="badge bg-success">Complète</span>
+                                                }
+                                                else if (tour.ZonesPointees > 0)
+                                                {
+                                                    <span class="badge bg-warning">Incomplète</span>
+                                                }
+                                                else if (tour.TourAssigné == true)
+                                                {
+                                                    <span class="badge bg-info">Assigné</span>
+                                                }
+                                                else if (tour.finTour < DateTime.Now)
+                                                {
+                                                    <span class="badge bg-danger">Non effectuée</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Non assignée</span>
+                                                }
+                                            </td>
+                                            <td>@tour.ZonesRequises</td>
+                                            <td>@tour.ZonesPointees</td>
+                                        }
+
+                                        <td>@tour.userId</td>
+
+                                        @if (isAdminOrChef)
+                                        {
+                                            <td>@tour.observation</td>
+                                            <td>
+                                                @if (!tour.tourFait && tour.finTour > DateTime.Now)
+                                                {
+                                                    <form asp-action="AssignTour" method="post">
+                                                        <input type="hidden" name="debTour" value="@tour.debTour" />
+                                                        <input type="hidden" name="finTour" value="@tour.finTour" />
+                                                        <input type="hidden" name="tourId" value="@tour.TourId" />
+                                                        <select name="username" class="form-select form-select-sm mb-1" required>
+                                                            <option disabled selected>-- Agent --</option>
+                                                            @foreach (var user in users)
+                                                            {
+                                                                <option value="@user">@user</option>
+                                                            }
+                                                        </select>
+                                                        <button type="submit" class="btn btn-sm btn-success w-100">
+                                                            <i class="bi bi-person-check"></i> Assigner
+                                                        </button>
+                                                    </form>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Expirée</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (tour.TourAssigné)
+                                                {
+                                                    <form asp-action="AssignObs" method="post">
+                                                        <input type="hidden" name="debTour" value="@tour.debTour" />
+                                                        <input type="hidden" name="finTour" value="@tour.finTour" />
+                                                        <input type="hidden" name="tourId" value="@tour.TourId" />
+                                                        <select name="observation" class="form-select form-select-sm mb-1" required>
+                                                            <option disabled selected>-- Observation --</option>
+                                                            @foreach (var obs in observations)
+                                                            {
+                                                                <option value="@obs.Id">@obs.Description</option>
+                                                            }
+                                                        </select>
+                                                        <button type="submit" class="btn btn-sm btn-info w-100">
+                                                            <i class="bi bi-pencil"></i> Modifier
+                                                        </button>
+                                                    </form>
+                                                }
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                @if (isAdminOrChef)
+                {
+                    <div class="row mt-4">
+                        @{
+                            var completed = Model.Count(t => t.tourFait);
+                            var incomplete = Model.Count(t => !t.tourFait && t.debPointage.HasValue);
+                            var missed = Model.Count(t => !t.debPointage.HasValue);
+                        }
+                        <div class="col-md-4">
+                            <div class="card text-white bg-success mb-3">
+                                <div class="card-body text-center">
+                                    <h5>Complétés</h5>
+                                    <p class="display-4">@completed</p>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="card text-dark bg-warning mb-3">
-                                    <div class="card-body text-center">
-                                        <h5 class="card-title">Incomplets</h5>
-                                        <p class="card-text display-4">@Model.Count(t => !t.tourFait && t.debPointage.HasValue)</p>
-                                    </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-warning mb-3">
+                                <div class="card-body text-center">
+                                    <h5>Incomplets</h5>
+                                    <p class="display-4">@incomplete</p>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="card text-white bg-danger mb-3">
-                                    <div class="card-body text-center">
-                                        <h5 class="card-title">Non effectués</h5>
-                                        <p class="card-text display-4">@Model.Count(t => !t.debPointage.HasValue)</p>
-                                    </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-white bg-danger mb-3">
+                                <div class="card-body text-center">
+                                    <h5>Non effectués</h5>
+                                    <p class="display-4">@missed</p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            }
+                }
+            </div>
         </div>
-    </div>}
+    }
 </div>

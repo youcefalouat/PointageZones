@@ -1,50 +1,4 @@
-﻿@* @model PointageZones.Models.PlanTour
-
-@{
-    ViewData["Title"] = "Edit";
-    Layout = "~/Views/Shared/_AdminLayout.cshtml";
-}
-
-<h1>Edit</h1>
-
-<h4>PlanTour</h4>
-<hr />
-<div class="row">
-    <div class="col-md-4">
-        <form asp-action="Edit">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <input type="hidden" asp-for="Id" />
-            <div class="form-group">
-                <label asp-for="TourId" class="control-label"></label>
-                <select asp-for="TourId" class="form-control" asp-items="ViewBag.TourId">
-                    <option disabled selected value="">-- Sélectionner une tournée --</option>
-                </select>
-                <span asp-validation-for="TourId" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="ZoneId" class="control-label"></label>
-                <select asp-for="ZoneId" class="form-control" asp-items="ViewBag.ZoneId">
-                    <option disabled selected value="">-- Sélectionner une zone --</option>
-                </select>
-                <span asp-validation-for="ZoneId" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <input type="submit" value="Save" class="btn btn-primary" />
-            </div>
-        </form>
-    </div>
-</div>
-
-<div>
-    <a asp-action="Index">Back to List</a>
-</div>
-
-@section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
-}
- *@
-
-@model PointageZones.Models.Tour
+﻿@* @model PointageZones.Models.Tour
 
 <h2>Modifier le Tour</h2>
 
@@ -74,3 +28,257 @@
     <br />
     <button type="submit" class="btn btn-primary">Enregistrer</button>
 </form>
+*@
+@model PointageZones.Models.Tour
+
+<h2>Modifier le Tour</h2>
+<a asp-controller="Tours" asp-action="Index" class="btn btn-primary">Retour à la liste</a>
+
+<form asp-action="Edit" method="post" id="tourForm">
+    <input type="hidden" asp-for="Id" />
+
+    <div class="form-group">
+        <label asp-for="RefTour" class="control-label"></label>
+        <input asp-for="RefTour" class="form-control" disabled />
+    </div>
+
+    <div class="form-group">
+        <label for="zones">Zones affectées</label>
+        <p class="text-muted small">Cochez les zones dans l'ordre souhaité pour la tournée</p>
+
+        <div class="row">
+            <!-- Zones disponibles -->
+            <div class="col-md-6">
+                <h5>Zones disponibles</h5>
+                <div id="availableZones" class="border p-3" style="min-height: 200px;">
+                    @foreach (var zone in ViewBag.Zones)
+                    {
+                        <div class="form-check zone-item" data-zone-id="@zone.Value" data-zone-text="@zone.Text"
+                             style="@(zone.Selected ? "display: none;" : "")">
+                            <input type="checkbox"
+                                   value="@zone.Value"
+                                   class="form-check-input zone-checkbox"
+                                   id="zone_@zone.Value"
+                            @(zone.Selected ? "checked" : "")>
+                            <label class="form-check-label" for="zone_@zone.Value">@zone.Text</label>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Zones sélectionnées avec ordre -->
+            <div class="col-md-6">
+                <h5>Zones sélectionnées (ordre de la tournée)</h5>
+                <div id="selectedZones" class="border p-3" style="min-height: 200px;">
+                    <!-- Les zones sélectionnées apparaîtront ici -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Champs cachés pour envoyer les données au contrôleur -->
+    <div id="hiddenInputs"></div>
+
+    <br />
+    <button type="submit" class="btn btn-primary">Enregistrer</button>
+</form>
+
+<style>
+    .zone-item {
+        padding: 5px;
+        margin: 2px 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: #f9f9f9;
+    }
+
+    .selected-zone {
+        background-color: #e7f3ff;
+        border-color: #007bff;
+        cursor: move;
+    }
+
+        .selected-zone .order-number {
+            background-color: #007bff;
+            color: white;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+    .remove-zone {
+        float: right;
+        color: #dc3545;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+        .remove-zone:hover {
+            color: #a71d2a;
+        }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const availableZones = document.getElementById('availableZones');
+        const selectedZones = document.getElementById('selectedZones');
+        const hiddenInputs = document.getElementById('hiddenInputs');
+        const form = document.getElementById('tourForm');
+
+        let selectedZonesList = [];
+
+        // Initialiser avec les zones déjà sélectionnées
+        initializeSelectedZones();
+
+        // Gérer les clics sur les checkboxes des zones disponibles
+        availableZones.addEventListener('change', function(e) {
+            if (e.target.classList.contains('zone-checkbox')) {
+                const zoneItem = e.target.closest('.zone-item');
+                const zoneId = parseInt(zoneItem.dataset.zoneId);
+                const zoneText = zoneItem.dataset.zoneText;
+
+                if (e.target.checked) {
+                    addZoneToSelected(zoneId, zoneText);
+                    zoneItem.style.display = 'none';
+                }
+            }
+        });
+
+        // Gérer la suppression des zones sélectionnées
+        selectedZones.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-zone')) {
+                const zoneId = parseInt(e.target.dataset.zoneId);
+                removeZoneFromSelected(zoneId);
+            }
+        });
+
+        // Gérer la soumission du formulaire
+        form.addEventListener('submit', function(e) {
+            updateHiddenInputs();
+        });
+
+        function initializeSelectedZones() {
+            // Récupérer les zones déjà cochées au chargement de la page
+            const checkedZones = document.querySelectorAll('.zone-checkbox:checked');
+            checkedZones.forEach(checkbox => {
+                const zoneItem = checkbox.closest('.zone-item');
+                const zoneId = parseInt(zoneItem.dataset.zoneId);
+                const zoneText = zoneItem.dataset.zoneText;
+                selectedZonesList.push({ id: zoneId, text: zoneText });
+            });
+            updateSelectedZonesDisplay();
+        }
+
+        function addZoneToSelected(zoneId, zoneText) {
+            selectedZonesList.push({ id: zoneId, text: zoneText });
+            updateSelectedZonesDisplay();
+        }
+
+        function removeZoneFromSelected(zoneId) {
+            selectedZonesList = selectedZonesList.filter(zone => zone.id !== zoneId);
+
+            // Remettre la zone dans les zones disponibles
+            const zoneItem = document.querySelector(`[data-zone-id="${zoneId}"]`);
+            if (zoneItem) {
+                zoneItem.style.display = 'block';
+                const checkbox = zoneItem.querySelector('.zone-checkbox');
+                checkbox.checked = false;
+            }
+
+            updateSelectedZonesDisplay();
+        }
+
+        function updateSelectedZonesDisplay() {
+            selectedZones.innerHTML = '';
+
+            if (selectedZonesList.length === 0) {
+                selectedZones.innerHTML = '<p class="text-muted">Aucune zone sélectionnée</p>';
+                return;
+            }
+
+            selectedZonesList.forEach((zone, index) => {
+                const zoneDiv = document.createElement('div');
+                zoneDiv.className = 'zone-item selected-zone';
+                zoneDiv.draggable = true;
+                zoneDiv.dataset.zoneId = zone.id;
+                zoneDiv.innerHTML = `
+                    <span class="order-number">${index + 1}</span>
+                    <span>${zone.text}</span>
+                    <span class="remove-zone" data-zone-id="${zone.id}">×</span>
+                `;
+
+                // Ajouter les événements de drag & drop
+                zoneDiv.addEventListener('dragstart', handleDragStart);
+                zoneDiv.addEventListener('dragover', handleDragOver);
+                zoneDiv.addEventListener('drop', handleDrop);
+                zoneDiv.addEventListener('dragend', handleDragEnd);
+
+                selectedZones.appendChild(zoneDiv);
+            });
+        }
+
+        function updateHiddenInputs() {
+            // Supprimer les anciens inputs cachés
+            hiddenInputs.innerHTML = '';
+
+            // Créer les nouveaux inputs avec deux tableaux séparés
+            selectedZonesList.forEach((zone, index) => {
+                const zoneIdInput = document.createElement('input');
+                zoneIdInput.type = 'hidden';
+                zoneIdInput.name = `ZoneIds`;
+                zoneIdInput.value = zone.id;
+
+                const orderInput = document.createElement('input');
+                orderInput.type = 'hidden';
+                orderInput.name = `ZoneOrders`;
+                orderInput.value = index + 1;
+
+                hiddenInputs.appendChild(zoneIdInput);
+                hiddenInputs.appendChild(orderInput);
+            });
+        }
+
+        // Fonctions de drag & drop pour réorganiser
+        let draggedElement = null;
+
+        function handleDragStart(e) {
+            draggedElement = this;
+            this.style.opacity = '0.5';
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            return false;
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            if (this !== draggedElement) {
+                const draggedZoneId = parseInt(draggedElement.dataset.zoneId);
+                const targetZoneId = parseInt(this.dataset.zoneId);
+
+                const draggedIndex = selectedZonesList.findIndex(z => z.id === draggedZoneId);
+                const targetIndex = selectedZonesList.findIndex(z => z.id === targetZoneId);
+
+                // Échanger les positions
+                const draggedZone = selectedZonesList[draggedIndex];
+                selectedZonesList.splice(draggedIndex, 1);
+                selectedZonesList.splice(targetIndex, 0, draggedZone);
+
+                updateSelectedZonesDisplay();
+            }
+            return false;
+        }
+
+        function handleDragEnd(e) {
+            this.style.opacity = '1';
+            draggedElement = null;
+        }
+    });
+</script>

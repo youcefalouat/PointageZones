@@ -12,6 +12,8 @@ namespace PointageZones.Models
         public required Tour Tour { get; set; }
         public int ZoneId { get; set; }
         public required Zone Zone { get; set; }
+        [Range(1, int.MaxValue, ErrorMessage = "L'ordre doit être supérieur à 0")]
+        public int Ordre { get; set; }
         public ICollection<PointageAgent> Pointages { get; set; } = new List<PointageAgent>();
 
     }

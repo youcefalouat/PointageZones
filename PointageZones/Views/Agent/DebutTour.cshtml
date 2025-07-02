@@ -136,6 +136,16 @@
             const db = window.pointageDB;
             console.log("Instance DB:", db);
 
+            // --- Fonction pour gérer le clic sur Scanner ---
+            function handleScanClick(event, planTourId, zoneRef, isFirstZone) {
+                if (!isFirstZone) {
+                    event.preventDefault();
+                    showToast(`Vous devez scanner les zones dans l'ordre. Scannez d'abord "${zoneRef}" qui est la prochaine zone.`, 'warning');
+                    return false;
+                }
+                return true;
+            }
+
             // --- Fonction de synchronisation directe ---
             async function syncPendingScansDirect() {
                 try {
@@ -227,24 +237,80 @@
                 }
                 
                 let listHtml = '<ul class="list-group list-group-flush">';
-                zones.forEach(zone => {
+            zones.forEach((zone, index) => {
                     if (!zone.planTourId || !zone.refZone) {
                         return; 
                     }
 
-                const scanUrl = `/Agent/ScannerQRCode?id=${zone.planTourId}`;
-                    listHtml += `<li class="list-group-item d-flex justify-content-between align-items-center ps-0 pe-0">
-                        <div><i class="bi bi-geo-alt-fill text-secondary me-2"></i>
-                        <span class="fw-bold">${zone.refZone || 'Zone inconnue'}</span></div>
-                        <a href="${scanUrl}" class="btn btn-primary btn-sm scanQrCodeBtn"
-                           data-plantour-id="${zone.planTourId}" data-zone-ref="${zone.refZone}">
-                           <i class="bi bi-qr-code-scan"></i> Scanner</a>
-                        </li>`;
+                // const scanUrl = `/Agent/ScannerQRCode?id=${zone.planTourId}`;
+                //     listHtml += `<li class="list-group-item d-flex justify-content-between align-items-center ps-0 pe-0">
+                //         <div><i class="bi bi-geo-alt-fill text-secondary me-2"></i>
+                //         <span class="fw-bold">${zone.refZone || 'Zone inconnue'}</span></div>
+                //         <a href="${scanUrl}" class="btn btn-primary btn-sm scanQrCodeBtn"
+                //            data-plantour-id="${zone.planTourId}" data-zone-ref="${zone.refZone}">
+                //            <i class="bi bi-qr-code-scan"></i> Scanner</a>
+                //         </li>`;
 
+                // });
+                // listHtml += '</ul>';
+                // container.innerHTML = listHtml;
+                const scanUrl = `/Agent/ScannerQRCode?id=${zone.planTourId}`;
+                const isFirstZone = index === 0; // Seule la première zone peut être scannée
+
+                let statusIcon = '';
+                let buttonClass = 'btn-primary';
+                let buttonText = 'Scanner';
+                let buttonDisabled = '';
+                let rowClass = '';
+
+                if (isFirstZone) {
+                    statusIcon = '<i class="bi bi-play-circle-fill text-primary me-2"></i>';
+                    buttonClass = 'btn-primary';
+                    buttonText = 'Scanner';
+                    rowClass = 'border-start border-primary border-3';
+                } else {
+                    statusIcon = '<i class="bi bi-hourglass-split text-muted me-2"></i>';
+                    buttonClass = 'btn-secondary';
+                    buttonText = 'En attente';
+                    buttonDisabled = 'disabled';
+                    rowClass = 'opacity-75';
+                }
+
+                listHtml += `<li class="list-group-item d-flex justify-content-between align-items-center ps-0 pe-0 ${rowClass}">
+                    <div>
+                        ${statusIcon}
+                        <span class="fw-bold ${isFirstZone ? 'text-primary' : 'text-muted'}">${zone.refZone || 'Zone inconnue'}</span>
+                      </div>
+                    <a href="${scanUrl}" class="btn ${buttonClass} btn-sm scanQrCodeBtn ${buttonDisabled}"
+                       data-plantour-id="${zone.planTourId}"
+                       data-zone-ref="${zone.refZone}"
+                       data-is-first="${isFirstZone}"
+                       ${buttonDisabled}>
+                       <i class="bi bi-qr-code-scan"></i> ${buttonText}
+                    </a>
+                </li>`;
+            });
+            listHtml += '</ul>';
+
+            
+
+            container.innerHTML = listHtml;
+
+            // Ajouter les gestionnaires d'événements pour les boutons de scan
+            const scanButtons = container.querySelectorAll('.scanQrCodeBtn');
+            scanButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const isFirstZone = button.getAttribute('data-is-first') === 'true';
+                    const zoneRef = button.getAttribute('data-zone-ref');
+                    const planTourId = button.getAttribute('data-plantour-id');
+
+                    if (!handleScanClick(event, planTourId, zoneRef, isFirstZone)) {
+                        return false;
+                    }
                 });
-                listHtml += '</ul>';
-                container.innerHTML = listHtml;
+            });
             }
+
             function manualReload() {
                     loadAndDisplayData().catch(console.error);
                 }
