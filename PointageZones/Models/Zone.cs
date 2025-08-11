@@ -18,7 +18,7 @@ namespace PointageZones.Models
         [Required]
         public required string RefZone { get; set; }
         public ZoneType? Type { get; set; }
-        public string? Tag { get; set; }
+        public required string? Tag { get; set; }
         public DateTime? lastUpdate { get; set; }
         //  public decimal? Latitude { get; set; } //Nullable
         //  public decimal? Longitude { get; set; } //Nullable

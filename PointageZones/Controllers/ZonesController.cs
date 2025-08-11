@@ -65,6 +65,8 @@ namespace PointageZones.Controllers
         {
             if (ModelState.IsValid)
             {
+                // Générer un tag aléatoire pour la zone
+                zone.Tag = await RandomTag();
                 zone.lastUpdate = DateTime.Now;
                 _context.Add(zone);
                 await _context.SaveChangesAsync();
@@ -167,8 +169,29 @@ namespace PointageZones.Controllers
         }
 
 
-        
-        
+        // Correction de la méthode RandomTag pour les diagnostics CS1983 et CS0161
+        public async Task<string> RandomTag()
+        {
+            Random random = new Random();
+            string newTag;
+            string validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            do
+            {
+                // Génère une chaîne aléatoire de 10 caractères
+                char[] tagArray = new char[10];
+                for (int i = 0; i < 10; i++)
+                {
+                    char randomChar = validChars[random.Next(validChars.Length)];
+                    tagArray[i] = randomChar;
+                }
+
+                newTag = new string(tagArray);
+
+                // Vérifie si ce tag existe déjà dans la base de données
+            } while (await _context.Zones.AnyAsync(z => z.Tag == newTag));
+            return newTag;
+        }
+
 
         public async Task<IActionResult> DownloadQRCodeAsync(int? id)
         {
@@ -185,24 +208,7 @@ namespace PointageZones.Controllers
 
                 try
                 {
-                    Random random = new Random();
-                    string newTag;
-                    string validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-                    do
-                    {
-                        // Generate a random string of 10 characters
-                        char[] tagArray = new char[10];
-                        for (int i = 0; i < 10; i++)
-                        {
-                            char randomChar = validChars[random.Next(validChars.Length)];
-                            tagArray[i] = randomChar;
-                        }
-
-                        newTag = new string(tagArray);
-
-                        // Check if this tag already exists in the database
-                    } while (await _context.Zones.AnyAsync(z => z.Tag == newTag));
-
+                    string newTag = await RandomTag();
                     zone.Tag = newTag;
                     zone.lastUpdate = DateTime.Now; 
                     _context.Update(zone);
